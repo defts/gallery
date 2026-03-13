@@ -10,12 +10,15 @@
   import {
     mdiAccount,
     mdiAccountMultiple,
+    mdiAccountGroup,
+    mdiAccountGroupOutline,
     mdiAccountMultipleOutline,
     mdiAccountOutline,
     mdiArchiveArrowDown,
     mdiArchiveArrowDownOutline,
     mdiCards,
     mdiCardsOutline,
+    mdiDatabaseImportOutline,
     mdiFolderOutline,
     mdiHeart,
     mdiHeartOutline,
@@ -67,6 +70,8 @@
     activeIcon={mdiAccountMultiple}
   />
 
+  <NavbarItem title={$t('spaces')} href={Route.spaces()} icon={mdiAccountGroupOutline} activeIcon={mdiAccountGroup} />
+
   <NavbarGroup title={$t('library')} size="tiny" />
 
   <NavbarItem title={$t('favorites')} href={Route.favorites()} icon={mdiHeartOutline} activeIcon={mdiHeart} />
@@ -101,6 +106,8 @@
   {/if}
 
   <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
+
+  <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
 
   <NavbarItem
     title={$t('archive')}
