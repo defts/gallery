@@ -45,6 +45,8 @@
 <Sidebar ariaLabel={$t('primary')}>
   <NavbarItem title={$t('photos')} href={Route.photos()} icon={mdiImageMultipleOutline} activeIcon={mdiImageMultiple} />
 
+  <NavbarItem title={$t('spaces')} href={Route.spaces()} icon={mdiAccountGroupOutline} activeIcon={mdiAccountGroup} />
+
   <NavbarItem title={$t('explore')} href={Route.explore()} icon={mdiMagnify} />
 
   {#if featureFlagsManager.value.map}
@@ -69,8 +71,6 @@
     icon={mdiAccountMultipleOutline}
     activeIcon={mdiAccountMultiple}
   />
-
-  <NavbarItem title={$t('spaces')} href={Route.spaces()} icon={mdiAccountGroupOutline} activeIcon={mdiAccountGroup} />
 
   <NavbarGroup title={$t('library')} size="tiny" />
 
