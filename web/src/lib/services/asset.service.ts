@@ -63,6 +63,7 @@ import { executeMutation, readPreloadedQuery } from '$lib/queries/client';
 import { getUserConfigQuery } from '$lib/queries/config-user.query';
 import { Route } from '$lib/route';
 import { SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
+import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getAssetMediaUrl, getSharedLink, sleep } from '$lib/utils';
 import { downloadUrl } from '$lib/utils';
 import { handleError } from '$lib/utils/handle-error';
