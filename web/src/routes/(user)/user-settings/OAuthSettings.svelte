@@ -3,7 +3,6 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { oauth } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { type UserAdminResponseDto } from '@immich/sdk';
   import { Button, toastManager } from '@immich/ui';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
