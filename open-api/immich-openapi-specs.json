@@ -31814,6 +31814,9 @@
           "map": {
             "$ref": "#/components/schemas/SystemConfigMapDto"
           },
+          "memories": {
+            "$ref": "#/components/schemas/SystemConfigMemoriesDto"
+          },
           "metadata": {
             "$ref": "#/components/schemas/SystemConfigMetadataDto"
           },
@@ -31864,6 +31867,7 @@
           "logging",
           "machineLearning",
           "map",
+          "memories",
           "metadata",
           "newVersionCheck",
           "nightlyTasks",
@@ -32393,6 +32397,30 @@
           "darkStyle",
           "enabled",
           "lightStyle"
+        ],
+        "type": "object"
+      },
+      "SystemConfigMemoriesDto": {
+        "properties": {
+          "birthday": {
+            "description": "Birthday memories",
+            "type": "boolean"
+          },
+          "recentTrips": {
+            "description": "Recent trip memories",
+            "type": "boolean"
+          },
+          "retentionDays": {
+            "description": "Retention days",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "birthday",
+          "recentTrips",
+          "retentionDays"
         ],
         "type": "object"
       },
