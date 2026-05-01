@@ -228,7 +228,7 @@
 
   const closeEditor = async () => {
     if (editManager.hasAppliedEdits) {
-      const refreshedAsset = await getAssetInfo({ id: asset.id });
+      const refreshedAsset = await getAssetInfo({ id: asset.id, spaceId });
       onAssetChange?.(refreshedAsset);
       assetViewerManager.setAsset(refreshedAsset);
     }
