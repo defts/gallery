@@ -720,6 +720,7 @@ export enum ImmichWorker {
 export enum ImmichTelemetry {
   Host = 'host',
   Api = 'api',
+  App = 'app',
   Io = 'io',
   Repo = 'repo',
   Job = 'job',
