@@ -1030,6 +1030,7 @@ export enum JobName {
   // Shared Space Face Recognition
   SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
+  SharedSpaceFaceMatchPage = 'SharedSpaceFaceMatchPage',
   SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
   SharedSpaceIdentityReconciliation = 'SharedSpaceIdentityReconciliation',
   SharedSpacePersonDedup = 'SharedSpacePersonDedup',
