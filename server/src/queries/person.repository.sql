@@ -216,78 +216,60 @@ from
   "similarity_threshold",
   "person_group"
   inner join "person" as "owned" on "owned"."personGroupId" = "person_group"."id"
-  and "owned"."ownerId" = $5
-  inner join (
-    select
-      "asset_face"."personGroupId",
-      count("asset"."id") as "faceCount"
-    from
-      "asset_face"
-      inner join "asset" on "asset"."id" = "asset_face"."assetId"
-      and "asset"."visibility" = 'timeline'
-      and "asset"."deletedAt" is null
-      and (
-        "asset"."ownerId" = any ($6::uuid[])
-        or exists (
-          select
-            1 as "exists"
-          from
-            "album_asset"
-            inner join "album" on "album"."id" = "album_asset"."albumId"
-            and "album"."deletedAt" is null
-            inner join "album_user" on "album_user"."albumId" = "album"."id"
-            and "album_user"."userId" = $7::uuid
-          where
-            "album_asset"."assetId" = "asset"."id"
-        )
-      )
-    where
-      "asset_face"."personGroupId" = any (
-        array(
-          (
-            select
-              "person"."personGroupId"
-            from
-              "person"
-            where
-              "person"."ownerId" = $8
-          )
-        )
-      )
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" is true
-    group by
-      "asset_face"."personGroupId"
-  ) as "faces" on "faces"."personGroupId" = "person_group"."id"
+  and "owned"."ownerId" = $6
+  left join "asset_face" on "asset_face"."personGroupId" = "person_group"."id"
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  left join "asset" on "asset"."id" = "asset_face"."assetId"
+  and "asset"."ownerId" = $7
+  and "asset"."visibility" = 'timeline'
+  and "asset"."deletedAt" is null
 where
+  "owned"."isHidden" = $8
+  and 1 = 1
+group by
+  "person_group"."id",
+  "owned"."ownerId",
+  "owned"."personGroupId"
+having
   (
-    "owned"."name" != $9
-    or "faces"."faceCount" >= COALESCE(
+    exists (
+      select
+        "person_user"."sharedWithId"
+      from
+        "person_user"
+      where
+        "person_user"."personGroupId" = "person_group"."id"
+        and "person_user"."sharedWithId" = $9
+    )
+    or (
+      count("asset"."id") > $10
+      and "owned"."name" != $11
+    )
+    or count("asset"."id") >= COALESCE(
       (
         SELECT
           value -> 'people' ->> 'minimumFaces'
         FROM
           user_metadata
         WHERE
-          "userId" = $10
+          "userId" = $12
           AND key = 'preferences'
       ),
       '3'
     )::int
   )
-  and "owned"."isHidden" = $11
-  and 1 = 1
 order by
   "owned"."isHidden" asc,
   "owned"."isFavorite" desc,
   NULLIF("owned"."name", '') is null asc,
-  "faces"."faceCount" desc,
+  count("asset"."id") desc,
   NULLIF("owned"."name", '') asc nulls last,
   "owned"."createdAt"
 limit
-  $12
-offset
   $13
+offset
+  $14
 
 -- PersonRepository.getAllWithoutFaces
 select
@@ -950,89 +932,60 @@ where
   )
 
 -- PersonRepository.getNumberOfPeople
+with
+  "similarity_threshold" as (
+    select
+      set_config('pg_trgm.word_similarity_threshold', '0.5', true) as "thresh"
+  )
 select
   coalesce(count(*), 0) as "total",
   coalesce(
     count(*) filter (
       where
-        "people"."isHidden" = $1
+        "owned"."isHidden" = $1
     ),
     0
   ) as "hidden"
 from
+  "similarity_threshold",
+  "person_group"
+  left join "person" as "owned" on "owned"."personGroupId" = "person_group"."id"
+  and "owned"."ownerId" = $2
+where
   (
-    with
-      "similarity_threshold" as (
+    (
+      "owned"."ownerId" is not null
+      and exists (
         select
-          set_config('pg_trgm.word_similarity_threshold', '0.5', true) as "thresh"
-      )
-    select
-      "owned"."isHidden"
-    from
-      "similarity_threshold",
-      "person_group"
-      inner join "person" as "owned" on "owned"."personGroupId" = "person_group"."id"
-      and "owned"."ownerId" = $2
-      inner join (
-        select
-          "asset_face"."personGroupId",
-          count("asset"."id") as "faceCount"
         from
           "asset_face"
-          inner join "asset" on "asset"."id" = "asset_face"."assetId"
-          and "asset"."visibility" = 'timeline'
-          and "asset"."deletedAt" is null
-          and (
-            "asset"."ownerId" = any ($3::uuid[])
-            or exists (
-              select
-                1 as "exists"
-              from
-                "album_asset"
-                inner join "album" on "album"."id" = "album_asset"."albumId"
-                and "album"."deletedAt" is null
-                inner join "album_user" on "album_user"."albumId" = "album"."id"
-                and "album_user"."userId" = $4::uuid
-              where
-                "album_asset"."assetId" = "asset"."id"
-            )
-          )
         where
-          "asset_face"."personGroupId" = any (
-            array(
-              (
-                select
-                  "person"."personGroupId"
-                from
-                  "person"
-                where
-                  "person"."ownerId" = $5
-              )
-            )
-          )
+          "asset_face"."personGroupId" = "person_group"."id"
           and "asset_face"."deletedAt" is null
-          and "asset_face"."isVisible" is true
-        group by
-          "asset_face"."personGroupId"
-      ) as "faces" on "faces"."personGroupId" = "person_group"."id"
-    where
-      (
-        "owned"."name" != $6
-        or "faces"."faceCount" >= COALESCE(
-          (
-            SELECT
-              value -> 'people' ->> 'minimumFaces'
-            FROM
-              user_metadata
-            WHERE
-              "userId" = $7
-              AND key = 'preferences'
-          ),
-          '3'
-        )::int
+          and "asset_face"."isVisible" = $3
+          and exists (
+            select
+            from
+              "asset"
+            where
+              "asset"."id" = "asset_face"."assetId"
+              and "asset"."ownerId" = $4
+              and "asset"."visibility" = 'timeline'
+              and "asset"."deletedAt" is null
+          )
       )
-      and 1 = 1
-  ) as "people"
+    )
+    or exists (
+      select
+        "person_user"."sharedById"
+      from
+        "person_user"
+      where
+        "person_user"."personGroupId" = "person_group"."id"
+        and "person_user"."sharedWithId" = $5
+    )
+  )
+  and 1 = 1
 
 -- PersonRepository.createGroup
 insert into
