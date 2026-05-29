@@ -399,7 +399,7 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
           lifeCycle.requestFullResume();
           return;
         }
-        unawaited(notifier.startForegroundBackup(currentUser.id));
+        unawaited(notifier.startBackup(currentUser.id));
       }
     }
   }
