@@ -1,10 +1,17 @@
 import { AssetEditAction, getAssetInfo, type AssetEditActionItemDto, type UserConfigDto } from '@immich/sdk';
-import { toastManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import { vitest } from 'vitest';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { queryClient } from '$lib/queries/client';
 import { getUserConfigQuery } from '$lib/queries/config-user.query';
-import { getAssetActions, handleDownloadAsset, mergeRotation, normalizeAngle } from '$lib/services/asset.service';
+import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
+import {
+  getAssetActions,
+  getAssetBulkActions,
+  handleDownloadAsset,
+  mergeRotation,
+  normalizeAngle,
+} from '$lib/services/asset.service';
 import { setSharedLink } from '$lib/utils';
 import { getFormatter } from '$lib/utils/i18n';
 import { assetFactory } from '@test-data/factories/asset-factory';
@@ -20,6 +27,11 @@ vitest.mock('@immich/ui', () => ({
   toastManager: {
     primary: vitest.fn(),
   },
+  modalManager: { show: vitest.fn() },
+}));
+
+vitest.mock('$lib/managers/asset-multi-select-manager.svelte', () => ({
+  assetMultiSelectManager: { assets: [{ id: 'x1' }, { id: 'x2' }] },
 }));
 
 vitest.mock('$lib/utils/i18n', () => ({
@@ -217,5 +229,22 @@ describe('AssetService', () => {
       expect(downloadUrlMock.mock.calls[0][0]).toContain('edited=false');
       expect(downloadUrlMock.mock.calls[0][0]).toContain('c=cache-1');
     });
+  });
+});
+
+describe('add to album/space entry points', () => {
+  beforeEach(() => vitest.mocked(modalManager.show).mockClear());
+
+  it('timeline bulk "+" opens the unified collection modal with the selected ids', () => {
+    const action = getAssetBulkActions(((k: string) => k) as never).AddToAlbum;
+    action.onAction(action);
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['x1', 'x2'] });
+  });
+
+  it('single-photo viewer "+" opens the unified collection modal with the one id', () => {
+    const asset = assetFactory.build({ id: 'single-1' });
+    const action = getAssetActions(() => '', asset).AddToAlbum;
+    action.onAction(action);
+    expect(modalManager.show).toHaveBeenCalledWith(AssetAddToCollectionModal, { assetIds: ['single-1'] });
   });
 });
