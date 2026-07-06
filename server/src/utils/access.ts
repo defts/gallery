@@ -257,7 +257,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Viewer,
       );
-      return isOwner.union(isShared);
+      const granted = isOwner.union(isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(auth.user.id, ids.difference(granted));
+      return granted.union(isSpaceLinked);
     }
 
     case Permission.AlbumAssetCreate: {
@@ -267,7 +269,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Editor,
       );
-      return isOwner.union(isShared);
+      const granted = isOwner.union(isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, ids.difference(granted));
+      return granted.union(isSpaceLinked);
     }
 
     case Permission.AlbumUpdate: {
@@ -301,7 +305,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Viewer,
       );
-      return isOwner.union(isShared);
+      const granted = isOwner.union(isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumReadAccess(auth.user.id, ids.difference(granted));
+      return granted.union(isSpaceLinked);
     }
 
     case Permission.AlbumAssetDelete: {
@@ -311,7 +317,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         ids.difference(isOwner),
         AlbumUserRole.Editor,
       );
-      return isOwner.union(isShared);
+      const granted = isOwner.union(isShared);
+      const isSpaceLinked = await access.album.checkSpaceLinkedAlbumAccess(auth.user.id, ids.difference(granted));
+      return granted.union(isSpaceLinked);
     }
 
     case Permission.AssetUpload: {
@@ -379,8 +387,8 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
       // representative-face picker and thumbnails) when the person's faces appear on assets
       // shared with them. Mutations (update/delete/merge) stay owner-only below.
       const isOwner = await access.person.checkOwnerAccess(auth.user.id, ids);
-      const isShared = await access.person.checkSharedSpaceAccess(auth.user.id, setDifference(ids, isOwner));
-      return setUnion(isOwner, isShared);
+      const isShared = await access.person.checkSharedSpaceAccess(auth.user.id, ids.difference(isOwner));
+      return isOwner.union(isShared);
     }
 
     case Permission.PersonUpdate:
