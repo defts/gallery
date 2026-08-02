@@ -20,6 +20,7 @@
   import { closeWebsocketConnection, openWebsocketConnection, websocketStore } from '$lib/stores/websocket';
   import { copyToClipboard } from '$lib/utils';
   import { maintenanceShouldRedirect } from '$lib/utils/maintenance';
+  import { searchShortcuts } from '$lib/utils/search-shortcut';
   import { getServerConfig } from '@immich/sdk';
   import {
     modalManager,
@@ -291,6 +292,7 @@
         globalSearchManager.setMode(next);
       },
     },
+    ...searchShortcuts(openModalSearch),
   ]}
 />
 
