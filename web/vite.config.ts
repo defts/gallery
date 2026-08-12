@@ -68,5 +68,6 @@ export default defineConfig({
     env: {
       TZ: 'UTC',
     },
+    clearMocks: true,
   },
 } as UserConfig);
