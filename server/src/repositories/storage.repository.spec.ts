@@ -336,6 +336,7 @@ describe(StorageRepository.name, () => {
 
   describe('getFolderSize', () => {
     it('sums nested file sizes recursively', async () => {
+      // eslint-disable-next-line import-x/no-named-as-default-member
       mockfs.restore();
       const testDir = join(tmpdir(), `immich-storage-repo-${Date.now()}`);
       try {
@@ -358,6 +359,7 @@ describe(StorageRepository.name, () => {
     });
 
     it('skips files rejected by the filter', async () => {
+      // eslint-disable-next-line import-x/no-named-as-default-member
       mockfs.restore();
       const testDir = join(tmpdir(), `immich-storage-filter-${Date.now()}`);
       try {
@@ -376,6 +378,7 @@ describe(StorageRepository.name, () => {
       // can vanish between `opendir` and `stat`. Uses a real temp dir (not mock-fs) because
       // mock-fs does not intercept `fs.promises.opendir`'s async iterator, so a mock-fs-only
       // version of this test would never reach the `stat` call it's meant to exercise.
+      // eslint-disable-next-line import-x/no-named-as-default-member
       mockfs.restore();
       const testDir = join(tmpdir(), `immich-storage-enoent-${Date.now()}`);
       try {
