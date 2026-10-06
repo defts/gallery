@@ -8194,7 +8194,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Filter assets taken after this date",
+            "description": "Filter assets taken on or after this local date and time (inclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -8206,7 +8206,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Filter assets taken before this date",
+            "description": "Filter assets taken before this local date and time (exclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -14208,7 +14208,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "x-immich-history": [
               {
                 "version": "v1",
@@ -14236,7 +14236,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "x-immich-history": [
               {
                 "version": "v1",
@@ -15165,7 +15165,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Filter suggestions by taken date (after)",
+            "description": "Filter suggestions by taken date: on or after this local date and time (inclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -15177,7 +15177,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Filter suggestions by taken date (before)",
+            "description": "Filter suggestions by taken date: before this local date and time (exclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -15422,7 +15422,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -15434,7 +15434,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -15508,7 +15508,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Filter suggestions by taken date (after)",
+            "description": "Filter suggestions by taken date: on or after this local date and time (inclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -15520,7 +15520,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Filter suggestions by taken date (before)",
+            "description": "Filter suggestions by taken date: before this local date and time (exclusive)",
             "schema": {
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -23582,7 +23582,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or after this date (ISO 8601)",
+            "description": "Only include assets taken on or after this local date and time (ISO 8601, inclusive)",
             "schema": {
               "type": "string"
             }
@@ -23591,7 +23591,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or before this date (ISO 8601)",
+            "description": "Only include assets taken before this local date and time (ISO 8601, exclusive)",
             "schema": {
               "type": "string"
             }
@@ -24012,7 +24012,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or after this date (ISO 8601)",
+            "description": "Only include assets taken on or after this local date and time (ISO 8601, inclusive)",
             "schema": {
               "type": "string"
             }
@@ -24021,7 +24021,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or before this date (ISO 8601)",
+            "description": "Only include assets taken before this local date and time (ISO 8601, exclusive)",
             "schema": {
               "type": "string"
             }
@@ -24447,7 +24447,7 @@
             "name": "takenAfter",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or after this date (ISO 8601)",
+            "description": "Only include assets taken on or after this local date and time (ISO 8601, inclusive)",
             "schema": {
               "type": "string"
             }
@@ -24456,7 +24456,7 @@
             "name": "takenBefore",
             "required": false,
             "in": "query",
-            "description": "Only include assets taken on or before this date (ISO 8601)",
+            "description": "Only include assets taken before this local date and time (ISO 8601, exclusive)",
             "schema": {
               "type": "string"
             }
@@ -34565,7 +34565,7 @@
           },
           "takenAfter": {
             "deprecated": true,
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -34588,7 +34588,7 @@
           },
           "takenBefore": {
             "deprecated": true,
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -37580,7 +37580,7 @@
           },
           "takenAfter": {
             "deprecated": true,
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -37603,7 +37603,7 @@
           },
           "takenBefore": {
             "deprecated": true,
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -38672,6 +38672,10 @@
           },
           "importFaces": {
             "description": "Whether face import is enabled",
+            "type": "boolean"
+          },
+          "localTakenRange": {
+            "description": "Whether takenAfter/takenBefore filters compare the local (wall-clock) taken time with an exclusive end. Absent on older servers, which compare the UTC instant with an inclusive end.",
             "type": "boolean"
           },
           "map": {
@@ -40939,7 +40943,7 @@
           },
           "takenAfter": {
             "deprecated": true,
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -40962,7 +40966,7 @@
           },
           "takenBefore": {
             "deprecated": true,
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -41414,7 +41418,7 @@
           },
           "takenAfter": {
             "deprecated": true,
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -41437,7 +41441,7 @@
           },
           "takenBefore": {
             "deprecated": true,
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -42287,7 +42291,7 @@
           },
           "takenAfter": {
             "deprecated": true,
-            "description": "Filter by taken date (after)",
+            "description": "Filter by taken date: on or after this local date and time (inclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
@@ -42310,7 +42314,7 @@
           },
           "takenBefore": {
             "deprecated": true,
-            "description": "Filter by taken date (before)",
+            "description": "Filter by taken date: before this local date and time (exclusive)",
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
