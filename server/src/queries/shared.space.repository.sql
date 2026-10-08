@@ -3472,7 +3472,8 @@ from
       "shared_space_member"."userId" = $5
     union
     select
-      "shared_space_member"."spaceId"
+      "shared_space_member"."spaceId",
+      "shared_space_member"."showInTimeline"
     from
       "shared_space_member"
       inner join "asset" on "asset"."id" = $6
