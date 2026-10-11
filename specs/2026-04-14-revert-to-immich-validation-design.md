@@ -304,7 +304,7 @@ the seeded database, then the revert runs on that same database:
   touches `enabled` and no upstream code overrides an admin's disable, so the guide carries the
   re-enable step instead of a fork hunk in the plugin import.
 - `stock-assert`: stock `schema-check` beyond the fresh-install baseline lists only `FunctionDrop` (Gallery's
-  trigger functions) and `OverrideDrop` (their `migration_overrides` rows, plus the triggers'). Upstream's
+  trigger functions) and `OverrideDrop` (Gallery's `migration_overrides` rows for functions, triggers and indexes). Upstream's
   drift options ignore extra tables (with their constraints) and extra columns, indexes or triggers,
   and no migration is reported because fork migrations live in `gallery_migrations`. The stock API serves
   the owner's asset and time bucket with the owner's favorites, and the trimmed video with its original

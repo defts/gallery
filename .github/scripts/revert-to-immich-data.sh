@@ -252,7 +252,7 @@ stock_assert() {
   local owner
   owner=$(login owner@example.com)
 
-  # Stock's drift check flags only Gallery's trigger functions and their migration_overrides rows: extra
+  # Stock's drift check flags only Gallery's trigger functions and Gallery's migration_overrides rows: extra
   # tables (with their constraints), columns, indexes and triggers are ignored by design. No migration
   # issue either: Gallery records its own migrations outside kysely_migrations.
   comm -23 "$drift" "$baseline" >"$STATE_DIR/drift-stock-new.txt"
