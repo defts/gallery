@@ -411,7 +411,6 @@ describe(DuplicateService.name, () => {
       const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-2']));
       mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1', 'tag-2']));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
@@ -468,7 +467,6 @@ describe(DuplicateService.name, () => {
       const asset1 = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       const asset2 = AssetFactory.create({ visibility: AssetVisibility.Archive });
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
@@ -512,7 +510,6 @@ describe(DuplicateService.name, () => {
       // eslint-disable-next-line unicorn/consistent-function-scoping -- test helper, kept local to this describe
       const setupBaseDuplicate = (asset1: any, asset2: any) => {
         mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
         mocks.duplicateRepository.get.mockResolvedValue({
           duplicateId: 'group-1',
           assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
@@ -618,7 +615,6 @@ describe(DuplicateService.name, () => {
         const asset1 = AssetFactory.create();
         const asset2 = AssetFactory.create();
         setupBaseDuplicate(asset1, asset2);
-        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
 
         const result = await sut.resolve(authStub.admin, {
           groups: [{ duplicateId: 'group-1', keepAssetIds: [], trashAssetIds: [asset1.id, asset2.id] }],
@@ -717,7 +713,6 @@ describe(DuplicateService.name, () => {
       const asset2 = AssetFactory.create();
       const checksum = Buffer.from('abc123', 'hex');
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
@@ -788,7 +783,6 @@ describe(DuplicateService.name, () => {
       const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
@@ -807,7 +801,6 @@ describe(DuplicateService.name, () => {
       const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
