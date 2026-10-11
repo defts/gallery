@@ -10,7 +10,7 @@ const UpdateAssetBaseSchema = z
   .object({
     // #763: deprecated alias for PUT /assets/favorites. Still routes into the SAME service method
     // (AssetService.updateFavorites) as the canonical endpoint, behind this DTO's stricter
-    // Permission.AssetUpdate route guard — see specs/2026-07-20-per-user-favorites-design.md §8.1.
+    // Permission.AssetUpdate route guard (see specs/2026-07-20-per-user-favorites-design.md §8.1).
     isFavorite: z
       .boolean()
       .optional()
