@@ -1579,7 +1579,7 @@ export class AssetRepository {
       // The predicate is built on a detached `expressionBuilder<DB, 'asset'>()` rather than the
       // callback's own `eb`: the `cities` CTE widens this query's schema to `DB & { cities }`, which
       // no longer satisfies the shared helpers' `ExpressionBuilder<DB, keyof DB>` parameter. The
-      // emitted SQL is identical — the predicate only ever references `asset.*`.
+      // emitted SQL is identical: the predicate only ever references `asset.*`.
       .where((eb) =>
         ownedOrSharedWithViewer(
           expressionBuilder<DB, 'asset'>(),

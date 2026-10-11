@@ -296,7 +296,7 @@ function spaceAlbumArm(
 
   return (
     root
-      // A1 invariant — the album must not be soft-deleted (unless explicitly opted out). Aliased so a
+      // A1 invariant: the album must not be soft-deleted (unless explicitly opted out). Aliased so a
       // caller can correlate on its own outer `album` row.
       .$if(notDeleted, (qb) =>
         qb.innerJoin('album as linked_album', (join) =>

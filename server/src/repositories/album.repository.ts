@@ -123,9 +123,9 @@ export class AlbumRepository {
   getByAssetId(ownerId: string, assetId: string) {
     // A space member must never learn that another member's Hidden/Locked asset sits in a linked
     // album, so both space-reached paths carry the space-shareable visibility gate (Archive/Timeline):
-    // below for a linked album, inside albumMembership for a contribution. The album_user arm is deliberately NOT gated: an album member — including
-    // the owner, who always has an album_user row — keeps seeing "Contained in" for their own
-    // Hidden/Locked assets.
+    // below for a linked album, inside albumMembership for a contribution. The album_user arm is
+    // deliberately NOT gated: an album member, including the owner (who always has an album_user
+    // row), keeps seeing "Contained in" for their own Hidden/Locked assets.
     const isSpaceShareable = (eb: ExpressionBuilder<DB, 'album'>) =>
       eb.exists(
         eb

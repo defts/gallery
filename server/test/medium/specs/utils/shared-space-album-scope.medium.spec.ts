@@ -373,7 +373,7 @@ const members = (albumIds: string[], via?: SpaceScope) =>
     .execute()
     .then((rows) => new Set(rows.map((row) => row.assetId)));
 
-describe('albumMembership — own rows plus live contributions', () => {
+describe('albumMembership: own rows plus live contributions', () => {
   it('reads album_asset alone without a scope, and adds only contributions made through the scoped space', async () => {
     const { ctx } = setup();
     const s = await seedContributions(ctx);

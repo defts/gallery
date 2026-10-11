@@ -103,9 +103,9 @@ const NON_DECL = new Set([
   // Bare calls to the fork's own gate/scope helpers, e.g. `spaceVisibilityGate(eb),` as the
   // first array element of an `eb.and([...])` conjunct. DECL cannot distinguish a call site
   // from a declaration (both look like `identifier(`), so without this exclusion the backward
-  // scan in enclosingFn stops at the call instead of continuing to the real enclosing function
-  // — misattributing the enclosing fn and defeating its allowlist
-  // entry (Slice 1 / security-1 regression).
+  // scan in enclosingFn stops at the call instead of continuing to the real enclosing function,
+  // misattributing the enclosing fn and defeating its allowlist entry (Slice 1 / security-1
+  // regression).
   'spaceVisibilityGate',
   // Same reason: `spaceAlbumAssetExists(eb, {` / `spaceContributedAssetExists(eb, {` as the first
   // token of a wrapped `.where((eb) => eb.not(...))` arm would otherwise be read as a declaration,

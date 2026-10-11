@@ -955,8 +955,8 @@ describe(SearchService.name, () => {
     // ACCESS (timeline.service resolves albumSpaceIds from plain membership) and shows every
     // member's photos; query mode kept the owner-scoping `userIds`, so the same album searched
     // returned only the caller's own assets beside a grid that had just shown everyone's.
-    // searchMetadata already resolves this the right way — access check instead of userIds, letting
-    // `albumConfinedToViewer` re-gate — and searchSmart now matches it.
+    // searchMetadata already resolves this the right way (access check instead of userIds, letting
+    // `albumConfinedToViewer` re-gate), and searchSmart now matches it.
     describe('album access (albumIds)', () => {
       it('checks album read access when albumIds is provided', async () => {
         const albumId = newUuid();

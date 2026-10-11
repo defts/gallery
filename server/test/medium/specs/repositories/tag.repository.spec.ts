@@ -584,7 +584,7 @@ describe(TagRepository.name, () => {
       expect(ids).toEqual(expect.arrayContaining([tagA.id, tagB.id]));
     });
 
-    it('GRANT — member sees a tag on a contribution to an album linked to the space, until the album is unlinked', async () => {
+    it('GRANT: member sees a tag on a contribution to an album linked to the space, until the album is unlinked', async () => {
       const { ctx, sut } = setup();
       const { user: owner } = await ctx.newUser();
       const { user: contributor } = await ctx.newUser();

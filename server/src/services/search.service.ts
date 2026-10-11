@@ -57,7 +57,7 @@ type ResolvedSmartSearch = {
   options: Omit<SmartSearchDto, 'page' | 'size' | 'order' | 'visibility'> & {
     embedding: string;
     // Optional: an `albumIds` scope deliberately leaves this unset so the album access check is the
-    // boundary and `albumConfinedToViewer` re-gates — see resolveSmartSearch.
+    // boundary and `albumConfinedToViewer` re-gates; see resolveSmartSearch.
     userIds?: string[];
     callerId?: string;
     authUserId: string;
