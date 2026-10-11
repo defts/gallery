@@ -539,8 +539,8 @@ export function withEdits(eb: ExpressionBuilder<DB, 'asset'>): AliasedEditAction
 
 const joinDeduplicationPlugin = new DeduplicateJoinsPlugin();
 /** TODO: This should only be used for search-related queries, not as a general purpose query builder */
-// fork's live search path — carries the owner/space RBAC gate. All fork search call-sites use this,
-// NOT the dormant V3 searchAssetBuilder below. See the search V3 coexistence spec.
+// The flat (legacy) search path, carrying the owner/space RBAC gate. Structured (V3) requests run
+// upstream's searchAssetBuilder below with Gallery's scope hooks. See the search V3 coexistence spec.
 export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
   options.withDeleted ||= !!(options.trashedAfter || options.trashedBefore || options.isOffline);
 

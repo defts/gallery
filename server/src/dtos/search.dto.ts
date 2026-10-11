@@ -500,8 +500,7 @@ const SearchAssetResponseSchema = z
     items: z.array(AssetResponseSchema),
     facets: z.array(SearchFacetResponseSchema),
     nextPage: z.string().nullable().describe('Next page token'),
-    // immich-30179: emitted by the (dormant) V3 path's mapResponse. Kept on the schema so the
-    // V3 methods still type-check while they stay unreachable.
+    // immich-30179: set by the structured (V3) search path; the flat endpoints send null.
     nextCursor: z.string().nullable().optional().describe('Opaque cursor for the next page'),
   })
   .meta({ id: 'SearchAssetResponseDto' });
