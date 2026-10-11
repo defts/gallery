@@ -77,6 +77,7 @@ const withoutComments = (content: string) =>
 const ASSET_WRITE_METHODS = new Set(['create', 'createAll', 'update', 'updateAll', 'upsert']);
 const ASSET_REPOSITORY = /\bassetRepo(?:sitory)?$/i;
 const KYSELY_ASSET_WRITE = /(updateTable|insertInto)\(\s*'asset'\s*\)/;
+const IS_FAVORITE_ASSIGNMENT = /\.isFavorite\s*(?:\?\?|\|\||&&)?=[^=]/;
 
 const keyName = (name: ts.PropertyName) => {
   if (ts.isComputedPropertyName(name)) {
@@ -164,7 +165,7 @@ describe('asset.isFavorite gate (#763)', () => {
       rawAssetWrites(content).some((statement) => statement.includes('"isFavorite"')),
     );
     expect(rawWriters.map(({ path }) => path)).toEqual(['src/schema/functions.ts']);
-    const assigners = sources.filter(({ content }) => /\.isFavorite\s*=[^=]/.test(withoutComments(content)));
+    const assigners = sources.filter(({ content }) => IS_FAVORITE_ASSIGNMENT.test(withoutComments(content)));
     expect(assigners.map(({ path }) => path)).toEqual(UPSTREAM_OWNER_ASSIGNMENTS);
   });
 
@@ -199,5 +200,12 @@ describe('asset.isFavorite gate (#763)', () => {
     expect(findColumnWrites('sample.ts', sample)).toHaveLength(7);
     expect(rawAssetWrites(`UPDATE asset SET name = $1, "isFavorite" = $2`)).toHaveLength(1);
     expect(rawAssetWrites(`update "asset_favorite" set "userId" = $1`)).toEqual([]);
+    const assignments = ['a.isFavorite = x', 'a.isFavorite ??= x', 'a.isFavorite ||= x', 'a.isFavorite &&= x'];
+    expect(assignments.filter((line) => IS_FAVORITE_ASSIGNMENT.test(line))).toEqual(assignments);
+    expect(
+      ['a.isFavorite == x', 'a.isFavorite === x', 'a.isFavorite !== x'].some((line) =>
+        IS_FAVORITE_ASSIGNMENT.test(line),
+      ),
+    ).toBe(false);
   });
 });
