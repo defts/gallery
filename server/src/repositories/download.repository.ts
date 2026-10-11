@@ -4,7 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { AssetVisibility } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { anyUuid } from 'src/utils/database.js';
-import { albumMembership, spaceAlbumAssetExists, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import { albumMembership, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 
 const builder = (db: Kysely<DB>) =>
   db
@@ -80,13 +80,25 @@ export class DownloadRepository {
       .where('asset.isOffline', '=', false)
       .where((eb) => spaceVisibilityGate(eb));
 
-    // The linked albums' own rows and their cross-owner contributions (#764) made to this space.
+    // The linked albums' own rows and their cross-owner contributions (#764) made to this space, as a
+    // row source rooted at the space's links: an EXISTS here plans as a scan of the whole asset table.
     const album = builder(this.db)
-      .where((eb) =>
-        spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, albumTimelineGate: 'none' }),
-      )
       .where((eb) => spaceVisibilityGate(eb))
-      .where('asset.isOffline', '=', false);
+      .where('asset.isOffline', '=', false)
+      .innerJoin(
+        (eb) =>
+          albumMembership(
+            eb,
+            eb
+              .selectFrom('shared_space_album')
+              .innerJoin('album', 'album.id', 'shared_space_album.albumId')
+              .select('shared_space_album.albumId')
+              .where('shared_space_album.spaceId', '=', spaceId)
+              .where('album.deletedAt', 'is', null),
+            { spaceId },
+          ).as('album_members'),
+        (join) => join.onRef('album_members.assetId', '=', 'asset.id'),
+      );
 
     return direct.union(library).union(album).stream();
   }

@@ -23,6 +23,7 @@ import {
   ReferenceExpression,
   SelectQueryBuilder,
   SqlBool,
+  StringReference,
   sql,
 } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum.js';
@@ -220,7 +221,8 @@ export function spaceContributedAssetExists(
  * Album membership as a row source `(albumId, assetId)`: the albums' own `album_asset` rows, plus the
  * cross-owner `album_space_asset` contributions that are live in `contributedVia` (album still linked
  * to the contribution's space, album not deleted, asset space-shareable). Without `contributedVia` it
- * is `album_asset` alone. `albums` is a list of ids or a correlated reference such as `'album.id'`.
+ * is `album_asset` alone. `albums` is a list of ids, a correlated reference such as `'album.id'`, or a
+ * subquery selecting `albumId` (keeps a whole-space read a row-source join instead of an asset scan).
  *
  * Unlike the EXISTS helpers, this hands out asset ids with no outer `asset` row to gate, so the
  * contributed arm carries the space visibility gate itself. UNION dedupes an asset that is both an
@@ -228,17 +230,22 @@ export function spaceContributedAssetExists(
  */
 export function albumMembership(
   eb: ExpressionBuilder<DB, keyof DB>,
-  albums: string[] | ReferenceExpression<DB, keyof DB>,
+  albums: string[] | StringReference<DB, keyof DB> | SelectQueryBuilder<DB, keyof DB, { albumId: string }>,
   contributedVia?: SpaceScope,
 ) {
+  const inAlbums = <QB extends SelectQueryBuilder<DB, keyof DB, object>>(
+    qb: QB,
+    column: 'album_asset.albumId' | 'album_space_asset.albumId',
+  ): QB => {
+    if (Array.isArray(albums)) {
+      return qb.where(column, '=', anyUuid(albums)) as QB;
+    }
+    return (typeof albums === 'string' ? qb.whereRef(column, '=', albums) : qb.where(column, 'in', albums)) as QB;
+  };
   const own = eb
     .selectFrom('album_asset')
     .select(['album_asset.albumId as albumId', 'album_asset.assetId as assetId'])
-    .$call((qb) =>
-      Array.isArray(albums)
-        ? qb.where('album_asset.albumId', '=', anyUuid(albums))
-        : qb.whereRef('album_asset.albumId', '=', albums),
-    );
+    .$call((qb) => inAlbums(qb, 'album_asset.albumId'));
   if (!contributedVia) {
     return own;
   }
@@ -247,11 +254,7 @@ export function albumMembership(
       .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
       .where((eb) => spaceVisibilityGate(eb))
       .select(['album_space_asset.albumId as albumId', 'album_space_asset.assetId as assetId'])
-      .$call((qb) =>
-        Array.isArray(albums)
-          ? qb.where('album_space_asset.albumId', '=', anyUuid(albums))
-          : qb.whereRef('album_space_asset.albumId', '=', albums),
-      ),
+      .$call((qb) => inAlbums(qb, 'album_space_asset.albumId')),
   );
 }
 
