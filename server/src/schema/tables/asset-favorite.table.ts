@@ -17,7 +17,7 @@ import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset), never about an
-// asset alone — see docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3.
+// asset alone — see specs/2026-07-20-per-user-favorites-design.md §3.
 // Carries its own createId/updateId watermarks (+ asset_favorite_audit) because favorites are a
 // separately-synced entity. Only the owner's row reaches the asset: the after-insert/after-delete
 // triggers project it onto asset."isFavorite", whose updatedAt trigger bumps asset.updateId, so stock

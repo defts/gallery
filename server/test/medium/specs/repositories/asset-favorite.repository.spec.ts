@@ -7,10 +7,8 @@ import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 
-// #763 slice 0 laid the schema foundation (`asset_favorite` / `asset_favorite_audit`), exercised
-// below directly via the Kysely DB handle. Slice 2 (this file's `AssetFavoriteRepository` describe
-// block, see docs/superpowers/plans/2026-07-20-per-user-favorites-slice-2.md Task 1) adds the
-// repository that Task 2's write path calls.
+// The `asset_favorite` / `asset_favorite_audit` schema is exercised directly through the Kysely handle; the
+// `AssetFavoriteRepository` describe block covers the repository the write path calls.
 
 let defaultDatabase: Kysely<DB>;
 

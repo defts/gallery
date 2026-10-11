@@ -6,7 +6,7 @@ import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
 
 // Per-user favorites overlay (#763). A favorite is a fact about (user, asset) — see
-// docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §3. `addAll`/`removeAll`
+// specs/2026-07-20-per-user-favorites-design.md §3. `addAll`/`removeAll`
 // are the only write surface onto `asset_favorite`; the subject is always the caller-supplied
 // `userId`, never resolved here — callers (the service layer) are responsible for pinning it
 // to the requesting user.
