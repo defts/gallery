@@ -96,7 +96,19 @@ const bootstrapGalleryLedger = async (db: Kysely<any>, galleryNames: string[], u
   const [moved] = await db.deleteFrom('kysely_migrations').where('name', 'in', galleryNames).execute();
   counts.moved = Number(moved.numDeletedRows);
 
-  // Kysely would refuse these too, but only as "previously executed migration ... is missing".
+  // Kysely would refuse these too, but only with upstream's "migrated by a newer version" text.
+  const forkRecorded = await db.selectFrom(GALLERY_MIGRATION_TABLE).select('name').execute();
+  const newerFork = forkRecorded.map(({ name }) => name as string).filter((name) => !galleryNames.includes(name));
+  if (newerFork.length > 0) {
+    throw new Error(
+      `Gallery migration "${newerFork.toSorted().at(-1)}" was recorded by a newer Gallery release than ${serverVersion}. ` +
+        `Undo it with that release first: https://docs.opennoodle.de/install/upgrading#rolling-back-to-an-earlier-release. ` +
+        `Nothing was changed.`,
+    );
+  }
+
+  // Kysely would refuse these too, but only as "previously executed migration ... is missing". A fork row of a newer
+  // build copied back into kysely_migrations for a pre-ledger target also lands here.
   const upstreamFiles = new Set(upstreamNames);
   const unknown = recordedRows
     .map(({ name }) => name as string)
