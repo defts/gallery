@@ -28,6 +28,11 @@ export const logCrossOwnerEdit = async (
   auth: AuthDto,
   assetIds: string[],
 ): Promise<void> => {
+  // Callers pass a validated array; the check lets CodeQL prove the loop below is bounded (js/loop-bound-injection).
+  if (!Array.isArray(assetIds)) {
+    return;
+  }
+
   try {
     // AssetDelete has no Gallery grant, so it answers "does the caller own it" without reading the assets.
     const ownedIds = await checkAccess(accessRepository, { auth, permission: Permission.AssetDelete, ids: assetIds });
