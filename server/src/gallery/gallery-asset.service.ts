@@ -90,19 +90,6 @@ export class GalleryAssetService extends BaseService {
       throw new BadRequestException('Video trimming is not available for external library videos');
     }
 
-    // getProbeInput hands ffprobe a path (disk) or a presigned URL (S3), so the request never downloads the video.
-    let probeResult: Awaited<ReturnType<typeof this.mediaRepository.probe>>;
-    try {
-      probeResult = await this.mediaRepository.probe(await this.backendMedia.getProbeInput(asset.originalPath));
-    } catch {
-      // ffprobe echoes its input in stderr, and for S3 that is a presigned URL (a credential): log the id only.
-      this.logger.error(`Failed to probe video for trim (asset ${id})`);
-      throw new BadRequestException('Unable to read video for trimming');
-    }
-    if (probeResult.videoStreams.length === 0) {
-      throw new BadRequestException('Cannot trim audio-only files');
-    }
-
     const durationSeconds = (asset.duration ?? 0) / 1000;
     if (durationSeconds <= 0) {
       throw new BadRequestException('Video duration is not available');
@@ -123,6 +110,19 @@ export class GalleryAssetService extends BaseService {
       // Web sends the full range when the handles are dragged back out: that is an undo, not a full-length re-encode.
       await this.removeTrim(auth, id);
       return { startTime: 0, endTime: durationSeconds, originalDuration: durationSeconds };
+    }
+
+    // getProbeInput hands ffprobe a path (disk) or a presigned URL (S3), so the request never downloads the video.
+    let probeResult: Awaited<ReturnType<typeof this.mediaRepository.probe>>;
+    try {
+      probeResult = await this.mediaRepository.probe(await this.backendMedia.getProbeInput(asset.originalPath));
+    } catch {
+      // ffprobe echoes its input in stderr, and for S3 that is a presigned URL (a credential): log the id only.
+      this.logger.error(`Failed to probe video for trim (asset ${id})`);
+      throw new BadRequestException('Unable to read video for trimming');
+    }
+    if (probeResult.videoStreams.length === 0) {
+      throw new BadRequestException('Cannot trim audio-only files');
     }
 
     await this.videoTrimRepository.upsert(id, dto.startTime, dto.endTime);

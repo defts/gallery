@@ -169,7 +169,6 @@ describe(GalleryAssetService.name, () => {
 
       it('removes an existing trim when given the full range, like DELETE', async () => {
         mocks.videoTrim.getForTrim.mockResolvedValue(video({ startTime: 10, endTime: 20 }));
-        mocks.media.probe.mockResolvedValue(videoStream);
         mocks.videoTrim.delete.mockResolvedValue(true);
 
         await expect(sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 30 })).resolves.toEqual({
@@ -178,6 +177,7 @@ describe(GalleryAssetService.name, () => {
           originalDuration: 30,
         });
 
+        expect(mocks.media.probe).not.toHaveBeenCalled();
         expect(mocks.videoTrim.upsert).not.toHaveBeenCalled();
         expect(mocks.videoTrim.delete).toHaveBeenCalledWith(assetId);
         expect(mocks.asset.update).toHaveBeenCalledWith({ id: assetId, isEdited: false });
@@ -199,15 +199,14 @@ describe(GalleryAssetService.name, () => {
         ['a video under 2 seconds', video({ duration: 1500 }), 'Video is too short to trim (minimum 2 seconds)'],
       ])('rejects %s', async (_, asset, message) => {
         mocks.videoTrim.getForTrim.mockResolvedValue(asset);
-        mocks.media.probe.mockResolvedValue(videoStream);
 
         await expect(sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 1 })).rejects.toThrow(message);
+        expect(mocks.media.probe).not.toHaveBeenCalled();
         expect(mocks.videoTrim.upsert).not.toHaveBeenCalled();
       });
 
       it('rejects an end time past the original duration', async () => {
         mocks.videoTrim.getForTrim.mockResolvedValue(video());
-        mocks.media.probe.mockResolvedValue(videoStream);
 
         await expect(sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 60 })).rejects.toThrow(
           'End time exceeds video duration',
@@ -216,7 +215,6 @@ describe(GalleryAssetService.name, () => {
 
       it('rejects a first trim that keeps the whole video', async () => {
         mocks.videoTrim.getForTrim.mockResolvedValue(video());
-        mocks.media.probe.mockResolvedValue(videoStream);
 
         await expect(sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 30 })).rejects.toThrow(
           'Trim must actually remove content',
