@@ -5543,6 +5543,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "deleted": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
+    },
     "favorites": {
       "metadata": [],
       "random": [],
@@ -5589,7 +5594,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -5611,6 +5626,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
     },
+    "deleted": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "favorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
@@ -5657,7 +5677,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -5679,6 +5709,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "deleted": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
+    },
     "favorites": {
       "metadata": [],
       "random": [],
@@ -5725,7 +5760,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -5743,6 +5788,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "statistics": "error:BadRequestException",
     },
     "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "deleted": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -5787,7 +5837,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -5844,6 +5904,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "stackAsset",
       ],
       "statistics": 14,
+    },
+    "deleted": {
+      "metadata": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "random": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "statistics": 2,
     },
     "favorites": {
       "metadata": [
@@ -5981,6 +6052,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 10,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset",
@@ -5991,6 +6067,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "contributedAsset*",
       ],
       "statistics": 2,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": [
@@ -6054,6 +6135,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "stackAsset",
       ],
       "statistics": 16,
+    },
+    "deleted": {
+      "metadata": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "random": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "statistics": 2,
     },
     "favorites": {
       "metadata": [
@@ -6205,6 +6297,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 12,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset",
@@ -6215,6 +6312,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "contributedAsset*",
       ],
       "statistics": 2,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": [
@@ -6276,6 +6378,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "stackAsset",
       ],
       "statistics": 14,
+    },
+    "deleted": {
+      "metadata": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "random": [
+        "ownTrashed",
+        "spaceTrashed",
+      ],
+      "statistics": 2,
     },
     "favorites": {
       "metadata": [
@@ -6391,7 +6504,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 12,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -6415,6 +6538,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "statistics": "error:BadRequestException",
     },
     "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "deleted": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -6459,6 +6587,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset",
@@ -6469,6 +6602,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "contributedAsset",
       ],
       "statistics": 2,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": "error:BadRequestException",
@@ -6496,6 +6634,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "editorAsset*",
       ],
       "statistics": 2,
+    },
+    "deleted": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
     },
     "favorites": {
       "metadata": [
@@ -6575,6 +6718,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 5,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset",
@@ -6585,6 +6733,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "contributedAsset",
       ],
       "statistics": 2,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": [
@@ -6605,6 +6758,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "statistics": "error:BadRequestException",
     },
     "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "deleted": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -6649,7 +6807,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",
@@ -6671,6 +6839,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "statistics": 1,
     },
     "default": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
+    },
+    "deleted": {
       "metadata": [],
       "random": [],
       "statistics": 0,
@@ -6749,6 +6922,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 3,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset*",
@@ -6759,6 +6937,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "contributedAsset",
       ],
       "statistics": 2,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": [
@@ -6783,6 +6966,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "deleted": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
+    },
     "favorites": {
       "metadata": [],
       "random": [],
@@ -6827,6 +7015,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
       "metadata": [
         "albumSpaceAsset",
@@ -6835,6 +7028,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
         "albumSpaceAsset",
       ],
       "statistics": 1,
+    },
+    "spaceFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
     },
     "tag": {
       "metadata": [],
@@ -6857,6 +7055,11 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       ],
       "statistics": 1,
     },
+    "deleted": {
+      "metadata": [],
+      "random": [],
+      "statistics": 0,
+    },
     "favorites": {
       "metadata": [
         "strangerAsset*",
@@ -6909,7 +7112,17 @@ exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1
       "random": [],
       "statistics": 0,
     },
+    "space": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
     "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceFavorites": {
       "metadata": "error:BadRequestException",
       "random": "error:BadRequestException",
       "statistics": "error:BadRequestException",

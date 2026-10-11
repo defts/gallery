@@ -12,10 +12,7 @@ import { MapMarkerDto } from 'src/dtos/map.dto.js';
 import { MetadataSearchDto, SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AlbumUserRole, AssetStatus, AssetVisibility, SharedLinkType, TimeBucketSize } from 'src/enum.js';
-import { FaceSearchRepository } from 'src/gallery/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/filter-suggestion.repository.js';
-import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
-import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -85,18 +82,15 @@ const seed = async () => {
       DownloadRepository,
       DuplicateRepository,
       FaceIdentityRepository,
-      FaceSearchRepository,
       FilterSuggestionRepository,
       MapRepository,
       MemoryRepository,
-      MemoryRuleAssetRepository,
       PartnerRepository,
       PersonRepository,
       SearchRepository,
       SharedLinkAssetRepository,
       SharedLinkRepository,
       SharedSpaceRepository,
-      SmartFacetRepository,
       SpaceAlbumRepository,
       StackRepository,
       SystemMetadataRepository,
@@ -482,10 +476,11 @@ describe('viewer-scope RBAC oracle', () => {
   });
 
   // Upstream's structured search (V3): the variants mirror the legacy ones above by name, so adopting V3
-  // can be checked against the legacy id sets for the same actor and variant.
+  // can be checked against the legacy id sets for the same actor and variant. V3 includes trash by default,
+  // so `deleted` asks for the trashed rows only; `space*` record that V3 does not take a space id.
   it('search V3: metadata, statistics and random', async () => {
     const sut = world.ctx.getService(SearchService);
-    const { ownAlbum, spaceAlbum, tagSpace, pet } = world.ids;
+    const { space, ownAlbum, spaceAlbum, tagSpace, pet } = world.ids;
     const variants = {
       default: () => ({ filter: {} }),
       shared: () => ({ withSharedSpaces: true, filter: {} }),
@@ -495,6 +490,9 @@ describe('viewer-scope RBAC oracle', () => {
       archive: () => ({ withSharedSpaces: true, filter: { visibility: { eq: AssetVisibility.Archive } } }),
       hidden: () => ({ filter: { visibility: { eq: AssetVisibility.Hidden } } }),
       locked: () => ({ filter: { visibility: { eq: AssetVisibility.Locked } } }),
+      deleted: () => ({ filter: { trashedAt: { ne: null } } }),
+      space: () => ({ spaceId: space, filter: {} }),
+      spaceFavorites: () => ({ spaceId: space, filter: { isFavorite: { eq: true } } }),
       ownAlbum: () => ({ filter: { albumIds: { any: [ownAlbum] } } }),
       spaceAlbum: () => ({ filter: { albumIds: { any: [spaceAlbum] } } }),
       tag: () => ({ withSharedSpaces: true, filter: { tagIds: { any: [tagSpace] } } }),
@@ -744,11 +742,15 @@ describe('viewer-scope RBAC oracle', () => {
         ),
         duplicates: await attempt(
           () => duplicateService.getDuplicates(auth),
-          (groups) => groups.map(({ assets }) => assetList(assets)),
+          (groups) =>
+            groups.map(({ assets }) => assetList(assets)).toSorted((a, b) => a.join(',').localeCompare(b.join(','))),
         ),
         stacks: await attempt(
           () => stackService.search(auth, {}),
-          (stacks) => stacks.map(({ id, assets }) => ({ stack: name(id), assets: assetList(assets) })),
+          (stacks) =>
+            stacks
+              .map(({ id, assets }) => ({ stack: name(id), assets: assetList(assets) }))
+              .toSorted((a, b) => a.stack.localeCompare(b.stack)),
         ),
       };
     }
