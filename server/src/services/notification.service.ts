@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { isAbsolute } from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { EmailImageAttachment, JobOf } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -26,7 +25,6 @@ import {
 } from 'src/enum.js';
 import { EmailTemplate } from 'src/repositories/email.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { getFilenameExtension } from 'src/utils/file.js';
 import { getExternalDomain } from 'src/utils/misc.js';
 import { isEqualObject } from 'src/utils/object.js';
@@ -441,6 +439,14 @@ export class NotificationService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    // An attachment path may be an S3 key, which the mailer cannot read: stage it locally until the mail is sent.
+    await using staged = new AsyncDisposableStack();
+    const imageAttachments: EmailImageAttachment[] = [];
+    for (const attachment of data.imageAttachments ?? []) {
+      const { localPath } = staged.use(await this.backendMedia.ensureLocalFile(attachment.path));
+      imageAttachments.push({ ...attachment, path: localPath });
+    }
+
     const { to, subject, html, text: plain } = data;
     const response = await this.emailRepository.sendEmail({
       to,
@@ -450,7 +456,7 @@ export class NotificationService extends BaseService {
       from: notifications.smtp.from,
       replyTo: notifications.smtp.replyTo || notifications.smtp.from,
       smtp: notifications.smtp.transport,
-      imageAttachments: data.imageAttachments,
+      imageAttachments: data.imageAttachments && imageAttachments,
     });
 
     this.logger.log(`Sent mail with id: ${response.messageId} status: ${response.response}`);
@@ -474,16 +480,11 @@ export class NotificationService extends BaseService {
       return;
     }
 
-    const filePath = albumThumbnailFiles[0].path;
-    const filename = `album-thumbnail${getFilenameExtension(filePath)}`;
-
-    // a disk thumbnail is attached by path for the mailer to read; an S3 key has no path to give it
-    if (!isAbsolute(filePath)) {
-      const content = await StorageService.resolveBackendForKey(filePath).readAll(filePath);
-      return { filename, cid: 'album-thumbnail', content };
-    }
-
-    return { filename, cid: 'album-thumbnail', path: filePath };
+    return {
+      filename: `album-thumbnail${getFilenameExtension(albumThumbnailFiles[0].path)}`,
+      path: albumThumbnailFiles[0].path,
+      cid: 'album-thumbnail',
+    };
   }
 
   private async sendAlbumLocalNotification(
