@@ -1204,6 +1204,17 @@ describe(AssetService.name, () => {
       expect(mocks.asset.updateAll).not.toHaveBeenCalled();
     });
 
+    it('joins a duplicate group that holds only assets the caller owns', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.duplicateRepository.hasOtherOwner.mockResolvedValue(false);
+
+      await sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' });
+
+      expect(mocks.duplicateRepository.hasOtherOwner).toHaveBeenCalledWith('group-1', auth.user.id);
+      expect(mocks.asset.updateAll).toHaveBeenCalledWith(['asset-1'], { duplicateId: 'group-1' });
+    });
+
     // #763: the deprecated isFavorite alias writes only the caller's own overlay row, so a space editor
     // favoriting a member's asset is allowed — and, being private state, it is not logged as an edit.
     it('lets a space editor favorite a non-owned asset via the alias without logging a cross-owner edit (#763)', async () => {
