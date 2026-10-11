@@ -978,6 +978,9 @@ patch_dockerfiles() {
   for dockerfile in "$REPO_ROOT/server/Dockerfile" "$REPO_ROOT/machine-learning/Dockerfile"; do
     if [[ -f "$dockerfile" ]]; then
       sed -i "s|immich-app/immich/actions/runs|${REPO_NAME}/actions/runs|g" "$dockerfile"
+      # Package pages first: the generic repo rewrite below would keep the upstream package names.
+      sed -i "s|immich-app/immich/pkgs/container/immich-server|${REPO_NAME}/pkgs/container/${DOCKER_SERVER_IMAGE}|g" "$dockerfile"
+      sed -i "s|immich-app/immich/pkgs/container/immich-machine-learning|${REPO_NAME}/pkgs/container/${DOCKER_ML_IMAGE}|g" "$dockerfile"
       sed -i "s|immich-app/immich/pkgs/container|${REPO_NAME}/pkgs/container|g" "$dockerfile"
       sed -i "s|ENV IMMICH_REPOSITORY=immich-app/immich|ENV IMMICH_REPOSITORY=${REPO_NAME}|g" "$dockerfile"
       sed -i "s|ENV IMMICH_REPOSITORY_URL=https://github.com/immich-app/immich|ENV IMMICH_REPOSITORY_URL=${REPO_URL}|g" "$dockerfile"

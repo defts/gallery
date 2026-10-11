@@ -271,6 +271,9 @@ for dockerfile in "server/Dockerfile" "machine-learning/Dockerfile"; do
     if grep -q "immich-app/immich" "$filepath"; then
       echo "  WARN: Upstream repo reference found in $dockerfile"
       EXIT_CODE=1
+    elif grep -q "pkgs/container/immich-" "$filepath"; then
+      echo "  WARN: Upstream package page found in $dockerfile"
+      EXIT_CODE=1
     else
       echo "  OK: $dockerfile"
     fi
