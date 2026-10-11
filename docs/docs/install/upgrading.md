@@ -42,7 +42,7 @@ Downgrading is not supported in general: an earlier release does not know the da
 
 ## Rolling back to an earlier release
 
-An earlier Gallery release refuses to start on a database that has Gallery migrations it does not ship. Undo those migrations first, with the release you are leaving, which is the one that knows how to undo them. Nothing stored in Gallery is lost: each step moves its data back to where the earlier release keeps it.
+An earlier Gallery release refuses to start on a database that has Gallery migrations it does not ship. Undo those migrations first, with the release you are leaving, which is the one that knows how to undo them. Each step moves its data back to where the earlier release keeps it, so nothing the earlier release can show is lost. Data for features the earlier release does not have goes with the step that undoes them: going back to a 5.7 release drops favorites set by anyone other than the asset's owner, and the record of who added each face. The procedure was tested going back to `v5.8.0-rc.1` and upgrading again; going back to 5.7 was not tested.
 
 1. Back up your database.
 2. Stop the stack with `docker compose down`, and keep the current image in your compose file for now.
@@ -64,6 +64,8 @@ An earlier Gallery release refuses to start on a database that has Gallery migra
    ```bash
    docker compose run --rm immich-server "node server/dist/bin/gallery-migrations.js revert"
    ```
+
+   This command does not go through the image's start script, so it does not read `*_FILE` secrets. If your compose file passes the database password or URL that way, add `-e DB_PASSWORD=<password>` (or `-e DB_URL=<url>`) to the `run` command.
 
 6. Releases before the separate `gallery_migrations` table (all of 5.7 and the 5.8 release candidates) look for their migration records in `kysely_migrations`. For those, copy the records back:
 
