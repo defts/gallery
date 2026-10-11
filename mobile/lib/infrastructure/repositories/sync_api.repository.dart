@@ -248,12 +248,15 @@ class SyncApiRepository {
         continue;
       }
 
-      // An older server can send a value this client's enums no longer know (an `AssetEditV1` 'trim' row);
-      // skipping that one line keeps the rest of the stream syncing.
+      // A Gallery server older than the trim endpoint sends trims as `AssetEditV1` rows whose action this client's
+      // enum no longer has; skipping that line keeps the rest of the stream syncing. Any other line fails as upstream.
       final Object event;
       try {
         event = converter(dataJson);
       } catch (error) {
+        if (type != SyncEntityType.assetEditV1) {
+          rethrow;
+        }
         final id = dataJson is Map ? dataJson['id'] : null;
         _logger.warning("Skipping undecodable $type line (id: $id): $error");
         continue;
