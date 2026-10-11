@@ -376,6 +376,37 @@ describe(DuplicateService.name, () => {
       expect(result[0].errorMessage).toContain('Every asset must be in either keepAssetIds or trashAssetIds');
     });
 
+    it("should fail before any write if a keeper is another owner's asset", async () => {
+      const theirs = AssetFactory.create();
+      const mine = AssetFactory.create();
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockImplementation((_userId, ids) =>
+        Promise.resolve(new Set([...ids].filter((id) => id !== theirs.id))),
+      );
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [theirs as unknown as MapAsset, mine as unknown as MapAsset],
+      });
+
+      await expect(
+        sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [theirs.id], trashAssetIds: [mine.id] }],
+        }),
+      ).resolves.toEqual([
+        {
+          id: 'group-1',
+          success: false,
+          error: BulkIdErrorReason.NO_PERMISSION,
+          errorMessage: 'No permission to update assets',
+        },
+      ]);
+
+      expect(mocks.sharedSpace.getEditableByAssetIds).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+      expect(mocks.assetFavorite.mergeOnto).not.toHaveBeenCalled();
+    });
+
     it('should sync merged tags to asset_exif.tags', async () => {
       const asset1 = AssetFactory.create();
       const asset2 = AssetFactory.create();
