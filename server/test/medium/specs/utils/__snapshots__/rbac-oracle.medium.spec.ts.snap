@@ -10154,6 +10154,68 @@ exports[`viewer-scope RBAC oracle > tags 1`] = `
 }
 `;
 
+exports[`viewer-scope RBAC oracle > time buckets for trash with shared spaces, below the service check 1`] = `
+{
+  "albumEditor": {
+    "trashShared": [],
+  },
+  "albumLink": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "albumViewer": {
+    "trashShared": [],
+  },
+  "individualLink": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "owner": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "ownerElevated": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "partner": {
+    "trashShared": [],
+  },
+  "spaceAlbumLink": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "spaceEditor": {
+    "trashShared": [],
+  },
+  "spaceLink": {
+    "trashShared": [
+      "ownTrashed",
+      "spaceTrashed",
+    ],
+  },
+  "spaceViewer": {
+    "trashShared": [],
+  },
+  "spaceViewerOff": {
+    "trashShared": [],
+  },
+  "stranger": {
+    "trashShared": [],
+  },
+}
+`;
+
 exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
 {
   "albumEditor": {
@@ -10213,6 +10275,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "albumLink": {
     "archive": "error:BadRequestException",
@@ -10238,6 +10301,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
     "stacked": "error:BadRequestException",
     "tag": "error:BadRequestException",
     "trash": "error:BadRequestException",
+    "trashShared": "error:BadRequestException",
   },
   "albumViewer": {
     "archive": {
@@ -10298,6 +10362,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "individualLink": {
     "archive": "error:BadRequestException",
@@ -10317,6 +10382,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
     "stacked": "error:BadRequestException",
     "tag": "error:BadRequestException",
     "trash": "error:BadRequestException",
+    "trashShared": "error:BadRequestException",
   },
   "owner": {
     "archive": {
@@ -10479,6 +10545,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       ],
       "count": 2,
     },
+    "trashShared": "error:BadRequestException",
   },
   "ownerElevated": {
     "archive": {
@@ -10647,6 +10714,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       ],
       "count": 2,
     },
+    "trashShared": "error:BadRequestException",
   },
   "partner": {
     "archive": {
@@ -10717,6 +10785,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "spaceAlbumLink": {
     "archive": "error:BadRequestException",
@@ -10742,6 +10811,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
     "stacked": "error:BadRequestException",
     "tag": "error:BadRequestException",
     "trash": "error:BadRequestException",
+    "trashShared": "error:BadRequestException",
   },
   "spaceEditor": {
     "archive": {
@@ -10838,6 +10908,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "spaceLink": {
     "archive": "error:BadRequestException",
@@ -10857,6 +10928,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
     "stacked": "error:BadRequestException",
     "tag": "error:BadRequestException",
     "trash": "error:BadRequestException",
+    "trashShared": "error:BadRequestException",
   },
   "spaceViewer": {
     "archive": {
@@ -10956,6 +11028,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "spaceViewerOff": {
     "archive": {
@@ -11029,6 +11102,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
   "stranger": {
     "archive": {
@@ -11088,6 +11162,7 @@ exports[`viewer-scope RBAC oracle > timeline buckets and bucket contents 1`] = `
       "assets": [],
       "count": 0,
     },
+    "trashShared": "error:BadRequestException",
   },
 }
 `;

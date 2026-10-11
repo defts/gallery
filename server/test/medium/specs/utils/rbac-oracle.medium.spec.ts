@@ -400,6 +400,8 @@ describe('viewer-scope RBAC oracle', () => {
       hidden: (auth: Auth) => ({ userId: me(auth), visibility: AssetVisibility.Hidden }),
       locked: (auth: Auth) => ({ userId: me(auth), visibility: AssetVisibility.Locked }),
       trash: (auth: Auth) => ({ userId: me(auth), isTrashed: true }),
+      // Rejected by the service; the repository cell below pins what the query itself returns.
+      trashShared: (auth: Auth) => ({ userId: me(auth), isTrashed: true, withSharedSpaces: true }),
       stacked: (auth: Auth) => ({
         userId: me(auth),
         withSharedSpaces: true,
@@ -437,6 +439,31 @@ describe('viewer-scope RBAC oracle', () => {
       ),
     );
     expect(result).toMatchSnapshot();
+  });
+
+  it('time buckets for trash with shared spaces, below the service check', async () => {
+    const sut = world.ctx.getService(TimelineService);
+    const assetRepository = world.ctx.get(AssetRepository);
+    const variants = {
+      trashShared: (auth: Auth) => ({ userId: me(auth), isTrashed: true, withSharedSpaces: true }),
+    };
+    const result = await matrix<Partial<TimeBucketDto>>(variants, (auth, dto) =>
+      attempt(async () => {
+        const options = await sut['buildTimeBucketOptions'](auth, { ...dto, bucketSize: TimeBucketSize.Month });
+        const items: Array<{ id: string }> = [];
+        for (const { timeBucket } of await assetRepository.getTimeBuckets(options, auth)) {
+          const { assets } = await assetRepository.getTimeBucket(timeBucket, options, auth);
+          items.push(...(JSON.parse(assets) as { id: string[] }).id.map((id) => ({ id })));
+        }
+        return items;
+      }, assetList),
+    );
+    // Link actors carry the link owner's user id here; the service rejects them before this point.
+    expect(result).toMatchSnapshot();
+    // Another member's trashed space asset never comes through the shared arm.
+    for (const member of ['spaceEditor', 'spaceViewer', 'spaceViewerOff'] as const) {
+      expect(result[member].trashShared).toEqual([]);
+    }
   });
 
   it('legacy search: metadata, statistics, random and large assets', async () => {
