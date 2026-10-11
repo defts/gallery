@@ -261,7 +261,8 @@ stock_assert() {
   cat "$STATE_DIR/drift-stock-new.txt"
   {
     sed -nE 's/^DROP FUNCTION IF EXISTS ([a-z_]+)\(.*/FunctionDrop \1/p' "$revert_sql"
-    grep -oE "'(function|trigger|index)_[A-Za-z0-9_]+'" "$revert_sql" | tr -d "'" | sed 's/^/OverrideDrop /'
+    awk '/DELETE FROM "migration_overrides"/{f=1} f; /;$/{f=0}' "$revert_sql" |
+      grep -oE "'(function|trigger|index)_[A-Za-z0-9_]+'" | tr -d "'" | sed 's/^/OverrideDrop /'
   } | sort -u >"$STATE_DIR/drift-allowed.txt"
   check stock 'drift is only the Gallery functions and override rows the revert script removes' \
     "$(sed -E 's/^  - FunctionDrop: The function "([^"]+)".*/FunctionDrop \1/; s/^  - OverrideDrop: The override "([^"]+)".*/OverrideDrop \1/' \
