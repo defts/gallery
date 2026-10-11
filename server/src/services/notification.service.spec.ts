@@ -795,13 +795,17 @@ describe(NotificationService.name, () => {
     });
 
     it('should send on_asset_update event when source is sidecar-write', async () => {
-      const asset = AssetFactory.from().exif().build();
+      const asset = AssetFactory.from({ isFavorite: true }).exif().build();
       mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([asset as any]);
 
       await sut.onAssetMetadataExtracted({ assetId: asset.id, userId: 'user-id', source: 'sidecar-write' });
 
       expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith([asset.id], 'user-id');
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_asset_update', 'user-id', expect.anything());
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
+        'on_asset_update',
+        'user-id',
+        expect.objectContaining({ isFavorite: true }),
+      );
     });
 
     it('should not send event when asset is not found for sidecar-write', async () => {

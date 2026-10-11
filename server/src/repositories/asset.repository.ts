@@ -1021,14 +1021,11 @@ export class AssetRepository {
     return this.db.selectFrom('asset_file').select(['assetId', 'path']).limit(sql.lit(3)).execute();
   }
 
-  // #763 slice 7: `authUserId` is the ACTING user (not necessarily the asset's owner) — the
-  // caller decides whose favorite carries over to the copy. See asset.service.ts `copy`.
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  getForCopy(id: string, authUserId: string) {
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForCopy(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['id', 'stackId', 'originalPath'])
-      .select((eb) => favoriteExistsFor(eb, authUserId).as('isFavorite'))
+      .select(['id', 'stackId', 'originalPath', 'isFavorite'])
       .select(withFiles)
       .where('id', '=', asUuid(id))
       .limit(1)

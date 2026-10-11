@@ -253,16 +253,13 @@ describe(AssetService.name, () => {
       expect(stack!.assets.length).toEqual(3);
     });
 
-    // #763 slice 7 (E20): copy carries the ACTING user's own overlay row for the source, not the
-    // owner's favorite that asset.isFavorite projects.
-    it('should copy favorite status for the acting user', async () => {
+    it('should copy favorite status', async () => {
       const { sut, ctx } = setup();
-      const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
+      const assetRepo = ctx.get(AssetRepository);
 
       const { user } = await ctx.newUser();
-      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: oldAsset } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
       const { asset: newAsset } = await ctx.newAsset({ ownerId: user.id });
-      await assetFavoriteRepo.addAll(user.id, [oldAsset.id]);
 
       await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });
       await ctx.newExif({ assetId: newAsset.id, description: 'bar' });
@@ -270,10 +267,10 @@ describe(AssetService.name, () => {
       const auth = factory.auth({ user: { id: user.id } });
       await sut.copy(auth, { sourceId: oldAsset.id, targetId: newAsset.id });
 
-      await expect(sut.get(auth, newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
+      await expect(assetRepo.getById(newAsset.id)).resolves.toEqual(expect.objectContaining({ isFavorite: true }));
     });
 
-    it("should not copy another user's favorite of the source (E20)", async () => {
+    it("should not copy another user's favorite of the source", async () => {
       const { sut, ctx } = setup();
       const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);
 
@@ -286,7 +283,7 @@ describe(AssetService.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: newAsset.id, addedById: owner.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: otherUser.id, role: 'viewer' });
 
-      // otherUser favorited the source; owner (the ACTOR performing the copy) did not.
+      // otherUser favorited the source; the owner did not, so the copied column stays false.
       await assetFavoriteRepo.addAll(otherUser.id, [oldAsset.id]);
 
       await ctx.newExif({ assetId: oldAsset.id, description: 'foo' });

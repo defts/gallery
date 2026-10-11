@@ -561,7 +561,7 @@ describe(JobService.name, () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const id = newUuid();
       const ownerId = newUuid();
-      const asset = AssetFactory.create({ id, ownerId, visibility: AssetVisibility.Timeline });
+      const asset = AssetFactory.create({ id, ownerId, visibility: AssetVisibility.Timeline, isFavorite: true });
       mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([asset] as any);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
@@ -569,7 +569,11 @@ describe(JobService.name, () => {
         data: { id, source: 'upload' },
       });
 
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_upload_success', ownerId, expect.anything());
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith(
+        'on_upload_success',
+        ownerId,
+        expect.objectContaining({ isFavorite: true }),
+      );
     });
 
     it('should send on_upload_success websocket event for Archive visibility assets', async () => {

@@ -1,8 +1,8 @@
-// Static guard for asset."isFavorite" (#763). The column is the OWNER's favorite, projected from the
-// `asset_favorite` overlay by the triggers in src/schema/functions.ts; the overlay is the only thing Gallery
-// writes. So no source file may write the column, and raw reads of it are allowed only where the query is
-// pinned to the owner it projects for (listed below). Everything else resolves the caller's own favorite
-// with favoriteExistsFor. A bare `isFavorite` string is not matched: it is indistinguishable from the many
+// Static guard for asset."isFavorite" (#763). The column is the OWNER's favorite, kept in step with the
+// `asset_favorite` overlay by the triggers in src/schema/functions.ts. Gallery code never writes the column;
+// upstream's owner-only write paths do (listed below), and the reverse trigger mirrors them into the owner's
+// overlay row. Raw reads are allowed only where the query is pinned to the owner it projects for (listed
+// below). Everything else resolves the caller's own favorite with favoriteExistsFor. A bare `isFavorite` string is not matched: it is indistinguishable from the many
 // other `isFavorite` names (DTO fields, person.isFavorite, `.as('isFavorite')` aliases).
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -40,6 +40,16 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
       "search V3's upstream default when AssetSearchScope.favoriteUserId is unset; Gallery always sets it for users and rejects a favourite filter from a shared link",
   },
 };
+
+// Upstream's own column writes, kept as upstream text because the writer is provably the asset's owner. Duplicate
+// resolve's `assetUpdate.isFavorite` is the third (owner-scoped groups, AssetDelete on every trashed id); it reaches
+// updateAll by reference, which the scan does not follow.
+const UPSTREAM_OWNER_WRITES = [
+  // upload: the uploader is the new asset's owner
+  'src/services/asset-media.service.ts: isFavorite: dto.isFavorite',
+  // copy: Permission.AssetCopy is owner-only on both assets, with no Gallery grant
+  'src/services/asset.service.ts: isFavorite: sourceAsset.isFavorite',
+];
 
 const collectTsFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -143,8 +153,9 @@ describe('asset.isFavorite gate (#763)', () => {
     expect(counts).toEqual(allowed);
   });
 
-  it('never writes the column from application code', () => {
-    expect(sources.flatMap(({ path, content }) => findColumnWrites(path, content))).toEqual([]);
+  it('writes the column only in the upstream owner-only paths listed here', () => {
+    const writes = sources.flatMap(({ path, content }) => findColumnWrites(path, content));
+    expect(writes.map((write) => write.replace(/:\d+:/, ':'))).toEqual(UPSTREAM_OWNER_WRITES);
     // Raw SQL: only the forward projection triggers write the column.
     const rawWriters = sources.filter(({ content }) =>
       rawAssetWrites(content).some((statement) => statement.includes('"isFavorite"')),

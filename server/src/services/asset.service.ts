@@ -357,10 +357,8 @@ export class AssetService extends BaseService {
     }: AssetCopyDto,
   ) {
     await this.requireAccess({ auth, permission: Permission.AssetCopy, ids: [sourceId, targetId] });
-    // #763 (E20): `getForCopy`'s `isFavorite` is the ACTING user's overlay row, not the owner's —
-    // see asset.repository.ts. Copy carries only that, never every user who favorited the source.
-    const sourceAsset = await this.assetRepository.getForCopy(sourceId, auth.user.id);
-    const targetAsset = await this.assetRepository.getForCopy(targetId, auth.user.id);
+    const sourceAsset = await this.assetRepository.getForCopy(sourceId);
+    const targetAsset = await this.assetRepository.getForCopy(targetId);
 
     if (!sourceAsset || !targetAsset) {
       throw new BadRequestException('Both assets must exist');
@@ -383,14 +381,7 @@ export class AssetService extends BaseService {
     }
 
     if (favorite) {
-      // Semantic sharpening (#763, E20), not a translation of the old column-update: the old
-      // code copied the source asset's GLOBAL isFavorite column; this copies the ACTING user's
-      // own favorite of the source onto the target, mirroring the old "set to whatever the
-      // source's value is" overwrite behaviour but scoped to auth.user.id only. Another user who
-      // also favorited the source is untouched — they never had a say in this copy.
-      await (sourceAsset.isFavorite
-        ? this.assetFavoriteRepository.addAll(auth.user.id, [targetId])
-        : this.assetFavoriteRepository.removeAll(auth.user.id, [targetId]));
+      await this.assetRepository.update({ id: targetId, isFavorite: sourceAsset.isFavorite });
     }
 
     if (sidecar) {
