@@ -2159,7 +2159,7 @@ async function phaseVideoTrimS3(): Promise<void> {
 
     // Undo: the edited objects must be removed from the bucket.
     const editedKeys = editedRows.map((r) => r.path);
-    await api('DELETE', `/assets/${assetId}/edits`, { token });
+    await api('DELETE', `/assets/${assetId}/trim`, { token });
     await waitForProcessing(token, 120_000);
 
     for (const key of editedKeys) {
