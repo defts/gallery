@@ -22,6 +22,11 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
       'columns.syncAsset (AssetSync streams only ownerId = the syncing user) and columns.workflowAssetV1 (listed twice, as upstream; workflow jobs act as the owner)',
   },
   'src/schema/functions.ts': { count: 2, reason: 'the forward projection trigger bodies' },
+  'src/utils/database.ts': {
+    count: 1,
+    reason:
+      "search V3's upstream default when AssetSearchScope.favoriteUserId is unset; Gallery always sets it for users and rejects a favourite filter from a shared link",
+  },
 };
 
 const collectTsFiles = (dir: string): string[] =>

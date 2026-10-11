@@ -1084,10 +1084,17 @@ where
     exists (
       select
       from
-        "album_asset"
+        (
+          select
+            "album_asset"."albumId" as "albumId",
+            "album_asset"."assetId" as "assetId"
+          from
+            "album_asset"
+          where
+            "album_asset"."albumId" = any ($3::uuid[])
+        ) as "album_asset"
       where
         "album_asset"."assetId" = "asset"."id"
-        and "album_asset"."albumId" = any ($3::uuid[])
     )
     or (
       "asset_exif"."city" = $4
@@ -1431,10 +1438,17 @@ where
   and exists (
     select
     from
-      "album_asset"
+      (
+        select
+          "album_asset"."albumId" as "albumId",
+          "album_asset"."assetId" as "assetId"
+        from
+          "album_asset"
+        where
+          "album_asset"."albumId" = any ($3::uuid[])
+      ) as "album_asset"
     where
       "album_asset"."assetId" = "asset"."id"
-      and "album_asset"."albumId" = any ($3::uuid[])
   )
 order by
   "asset"."fileCreatedAt" desc,
@@ -1545,10 +1559,17 @@ where
   and exists (
     select
     from
-      "album_asset"
+      (
+        select
+          "album_asset"."albumId" as "albumId",
+          "album_asset"."assetId" as "assetId"
+        from
+          "album_asset"
+        where
+          "album_asset"."albumId" = any ($3::uuid[])
+      ) as "album_asset"
     where
       "album_asset"."assetId" = "asset"."id"
-      and "album_asset"."albumId" = any ($3::uuid[])
   )
 order by
   "asset"."fileCreatedAt" desc,
@@ -2061,15 +2082,7 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    exists (
-      select
-        1 as "exists"
-      from
-        "asset_favorite"
-      where
-        "asset_favorite"."assetId" = "asset"."id"
-        and "asset_favorite"."userId" = $4::uuid
-    )
+    "asset"."isFavorite" = $4
     or exists (
       select
       from
@@ -2131,24 +2144,23 @@ where
     and "asset"."fileCreatedAt" >= $4
     and (
       (
-        exists (
-          select
-            1 as "exists"
-          from
-            "asset_favorite"
-          where
-            "asset_favorite"."assetId" = "asset"."id"
-            and "asset_favorite"."userId" = $5::uuid
-        )
+        "asset"."isFavorite" = $5
         and "asset"."ownerId" = any ($6::uuid[])
       )
       or exists (
         select
         from
-          "album_asset"
+          (
+            select
+              "album_asset"."albumId" as "albumId",
+              "album_asset"."assetId" as "assetId"
+            from
+              "album_asset"
+            where
+              "album_asset"."albumId" = any ($7::uuid[])
+          ) as "album_asset"
         where
           "album_asset"."assetId" = "asset"."id"
-          and "album_asset"."albumId" = any ($7::uuid[])
       )
     )
   )
@@ -2198,15 +2210,7 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
-  )
+  and "asset"."isFavorite" = $4
 order by
   "asset"."fileCreatedAt" desc,
   "asset"."id" desc
@@ -2297,15 +2301,7 @@ where
     "asset"."visibility" != $2
     or "asset"."ownerId" = $3
   )
-  and exists (
-    select
-      1 as "exists"
-    from
-      "asset_favorite"
-    where
-      "asset_favorite"."assetId" = "asset"."id"
-      and "asset_favorite"."userId" = $4::uuid
-  )
+  and "asset"."isFavorite" = $4
 order by
   random()
 limit
@@ -2515,15 +2511,7 @@ where
     or "asset"."ownerId" = $3
   )
   and (
-    exists (
-      select
-        1 as "exists"
-      from
-        "asset_favorite"
-      where
-        "asset_favorite"."assetId" = "asset"."id"
-        and "asset_favorite"."userId" = $4::uuid
-    )
+    "asset"."isFavorite" = $4
     or not exists (
       select
       from

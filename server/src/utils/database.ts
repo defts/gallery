@@ -806,8 +806,13 @@ function idsPredicates(
   return predicates;
 }
 
-function albumIdsPredicates(eb: AssetExpressionBuilder, filter?: IdsFilter) {
-  const matching = (ids: string[]) => albumAssets(eb).where('album_asset.albumId', '=', anyUuid(ids));
+function albumIdsPredicates(eb: AssetExpressionBuilder, filter?: IdsFilter, albumSpaceIds?: string[]) {
+  const matching = (ids: string[]) =>
+    eb
+      .selectFrom(
+        albumMembership(eb, ids, albumSpaceIds?.length ? { spaceIds: albumSpaceIds } : undefined).as('album_asset'),
+      )
+      .whereRef('album_asset.assetId', '=', 'asset.id');
   return idsPredicates(eb, filter, {
     matchesAny: (ids) => eb.exists(matching(ids)),
     matchesAll: (ids) =>
@@ -955,21 +960,23 @@ function existsPredicates(
 
 // predicates are collected as expressions rather than chained `where` calls so the same
 // helpers can build each `or` branch, which must compose into eb.and/eb.or
-function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch, authUserId?: string) {
+// Favourites are per user (asset_favorite); `asset.isFavorite` is the owner's, upstream's default.
+function favoritePredicate(eb: AssetExpressionBuilder, eq: boolean, favoriteUserId?: string) {
+  if (!favoriteUserId) {
+    return eb('asset.isFavorite', '=', eq);
+  }
+  const favorite = favoriteExistsFor(eb, favoriteUserId);
+  return eq ? favorite : eb.not(favorite);
+}
+
+function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch, scope: AssetSearchScope) {
   const { encodedVideoPath } = branch;
   return [
     ...comparisonPredicates(eb, 'asset.id', branch.id),
     ...comparisonPredicates(eb, 'asset.libraryId', branch.libraryId),
     ...comparisonPredicates(eb, 'asset.type', branch.type),
     ...comparisonPredicates(eb, 'asset.visibility', branch.visibility),
-    // #763: favorites are a per-user overlay (asset_favorite); `asset.isFavorite` holds only the
-    // owner's, and V3 scopes by partners too. Resolved for the CALLER, mirroring
-    // searchAssetBuilderLegacy's isFavorite arm above. V3 is dormant in the fork (see the
-    // coexistence spec), so `authUserId` has no live caller yet; whoever wires V3 to an endpoint
-    // must thread it, exactly as the legacy path already does.
-    ...(branch.isFavorite
-      ? [branch.isFavorite.eq ? favoriteExistsFor(eb, authUserId!) : eb.not(favoriteExistsFor(eb, authUserId!))]
-      : []),
+    ...(branch.isFavorite ? [favoritePredicate(eb, branch.isFavorite.eq, scope.favoriteUserId)] : []),
     ...(branch.isOffline ? [eb('asset.isOffline', '=', branch.isOffline.eq)] : []),
     ...(branch.isMotion ? [eb('asset.livePhotoVideoId', branch.isMotion.eq ? 'is not' : 'is', null)] : []),
     ...existsPredicates(eb, branch.isEncoded, () => encodedVideoFiles(eb)),
@@ -1003,7 +1010,7 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
     ...comparisonPredicates(eb, 'asset.createdAt', branch.createdAt),
     ...comparisonPredicates(eb, 'asset.updatedAt', branch.updatedAt),
     ...comparisonPredicates(eb, 'asset.deletedAt', branch.trashedAt),
-    ...albumIdsPredicates(eb, branch.albumIds),
+    ...albumIdsPredicates(eb, branch.albumIds, scope.albumSpaceIds),
     ...personIdsPredicates(eb, branch.personIds),
     ...tagIdsPredicates(eb, branch.tagIds),
     ...checksumPredicates(eb, branch.checksum),
@@ -1019,17 +1026,14 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
   ];
 }
 
-// ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-// Not wired to any controller/service. The fork's live search uses searchAssetBuilderLegacy
-// (above), which carries the owner/space RBAC gate. Do not call this V3 builder from fork code.
-// Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
-//
 // ordering is deliberately left to the caller so aggregate-only consumers (counts, stats)
 // can compose the same filters without stripping an order by
 export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
   const filter = options.filter ?? {};
   const branches = filter.or ?? [];
-  const ownershipPredicate = (eb: AssetExpressionBuilder) => eb('asset.ownerId', '=', anyUuid(scope.userIds));
+  const ownershipPredicate =
+    scope.ownershipPredicate ?? ((eb: AssetExpressionBuilder) => eb('asset.ownerId', '=', anyUuid(scope.userIds)));
+  const confinedPredicate = scope.albumConfinedPredicate;
   // search universe: own+partner assets unless album-confined, which searches the albums instead;
   // ownership lands nowhere (top level confined), per unconfined branch, or hoisted globally
   const topConfined = isAlbumConfined(filter);
@@ -1045,6 +1049,7 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
       .$if(!!options.withExif, (qb) => qb.select(selectExifInfo))
       .$if(scopeGlobally, (qb) => qb.where(ownershipPredicate))
+      .$if(topConfined && !!confinedPredicate, (qb) => qb.where(confinedPredicate!))
       .where((eb) =>
         eb.or([eb('asset.visibility', '!=', AssetVisibility.Locked), eb('asset.ownerId', '=', scope.lockedOwnerId)]),
       )
@@ -1053,14 +1058,15 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
       )
       .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
       .where((eb) => {
-        const predicates = branchPredicates(eb, filter, options.authUserId);
+        const predicates = branchPredicates(eb, filter, scope);
         if (branches.length > 0) {
           predicates.push(
             eb.or(
               branches.map((branch) =>
                 eb.and([
-                  ...branchPredicates(eb, branch, options.authUserId),
+                  ...branchPredicates(eb, branch, scope),
                   ...(scopePerBranch && !isAlbumConfined(branch) ? [ownershipPredicate(eb)] : []),
+                  ...(scopePerBranch && isAlbumConfined(branch) && confinedPredicate ? [confinedPredicate(eb)] : []),
                 ]),
               ),
             ),

@@ -144,10 +144,6 @@ const SearchSuggestionRequestSchema = withGallerySuggestionScope(SearchSuggestio
   id: 'SearchSuggestionRequestDto',
 });
 
-// ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-// Not wired to any controller/service. The fork's live search runs on the legacy
-// path (searchAssetBuilderLegacy in search.repository.ts). Do not call from fork code.
-// Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
 const IdFilterSchema = nonEmptyPartial({
   eq: z.uuidv4(),
   ne: z.uuidv4(),

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type Expression,
   type ExpressionBuilder,
   type Kysely,
   type OrderByDirection,
@@ -222,16 +223,19 @@ export interface AssetSearchScope {
   lockedOwnerId: string;
   /** whose version of the people to select, required when selecting faces or people */
   viewingUserId?: string;
+  // Gallery hooks: each one unset means upstream behaviour (see searchScopeV3 in src/utils/viewer-scope.ts).
+  /** The search universe (default: `asset.ownerId = any(userIds)`). */
+  ownershipPredicate?: (eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>) => Expression<SqlBool>;
+  /** Re-gates the album-confined parts, where upstream applies no ownership (default: none). */
+  albumConfinedPredicate?: (eb: ExpressionBuilder<DB, 'asset' | 'asset_exif'>) => Expression<SqlBool>;
+  /** `albumIds` also matches the live contributions made through these spaces (default: `album_asset` only). */
+  albumSpaceIds?: string[];
+  /** Whose favourites `isFavorite` filters and returns (default: the owner's `asset.isFavorite`). */
+  favoriteUserId?: string;
 }
 
 export interface AssetSearchBuilderV3Options {
   filter?: SearchFilter;
-  /**
-   * #763: the CALLER's id, used to resolve `filter.isFavorite` against the per-user
-   * `asset_favorite` overlay (`asset.isFavorite` holds only the owner's). Mirrors
-   * `AssetSearchBuilderOptions.authUserId` on the legacy path. Never client-controlled.
-   */
-  authUserId?: string;
   withExif?: boolean;
   withFaces?: boolean;
   withPeople?: boolean;
@@ -869,14 +873,13 @@ export class SearchRepository {
   }
 
   // TODO(v4): drop the V3 suffix once the legacy methods are removed
-  // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
-  // Not wired to any controller/service. The fork's live search runs on the legacy path
-  // (searchAssetBuilderLegacy). Do not call these V3 methods from fork code.
-  // Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
   @GenerateSql(...searchMetadataV3Examples)
   async searchMetadataV3(pagination: PaginationOptions, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
     const items = await withSearchOrder(searchAssetBuilder(this.db, options, scope), options.order)
       .select(columns.searchAsset)
+      .$if(!!scope.favoriteUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+      )
       .limit(pagination.take + 1)
       .offset(pagination.skip ?? 0)
       .execute();
@@ -892,6 +895,9 @@ export class SearchRepository {
   ): Promise<MapAsset[]> {
     return searchAssetBuilder(this.db, options, scope)
       .select(columns.searchAsset)
+      .$if(!!scope.favoriteUserId, (qb) =>
+        qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+      )
       .orderBy(sql`random()`)
       .limit(size)
       .execute();
@@ -908,6 +914,9 @@ export class SearchRepository {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
       const items = await searchAssetBuilder(trx, options, scope)
         .select(columns.searchAsset)
+        .$if(!!scope.favoriteUserId, (qb) =>
+          qb.select((eb) => favoriteExistsFor(eb, scope.favoriteUserId!).as('isFavoriteForUser')),
+        )
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
         .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
         .orderBy('asset.id', 'asc')
