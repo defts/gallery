@@ -254,6 +254,13 @@ export class AssetService extends BaseService {
       }
     }
 
+    // A duplicateId is visible on any asset the caller can read. Joining another owner's group would block that owner's
+    // resolve (their list never shows our asset) and let ours reach their keeper.
+    const duplicateGroup = duplicateId ? await this.duplicateRepository.get(duplicateId) : undefined;
+    if (duplicateGroup?.assets.some(({ ownerId }) => ownerId !== auth.user.id)) {
+      throw new ForbiddenException('Duplicate grouping can only join a group of assets you own');
+    }
+
     // #763: isFavorite is the deprecated alias for PUT /assets/favorites (§8.1) — it no longer goes
     // into the plain column write (assetDto below). Routed through the SAME updateFavorites logic
     // as the canonical endpoint, so the alias can never be more permissive.

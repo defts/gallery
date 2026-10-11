@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { type AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
+import { type AssetResponseDto, type MapAsset, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto.js';
 import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto.js';
 import {
@@ -1185,6 +1185,19 @@ describe(AssetService.name, () => {
       mocks.access.spaceAsset.checkSpaceEditAccess.mockResolvedValue(new Set(['asset-2']));
 
       await expect(sut.updateAll(auth, { ids: ['asset-1', 'asset-2'], duplicateId: null })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(mocks.asset.updateAll).not.toHaveBeenCalled();
+    });
+
+    it("rejects joining another owner's duplicate group", async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      const theirs = AssetFactory.create({ ownerId: newUuid() }) as unknown as MapAsset;
+      mocks.duplicateRepository.get.mockResolvedValue({ duplicateId: 'group-1', assets: [theirs] });
+
+      await expect(sut.updateAll(auth, { ids: ['asset-1'], duplicateId: 'group-1' })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
 

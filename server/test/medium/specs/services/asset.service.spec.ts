@@ -9,6 +9,7 @@ import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
+import { DuplicateRepository } from 'src/repositories/duplicate.repository.js';
 import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
@@ -40,6 +41,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      DuplicateRepository,
       PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
@@ -567,6 +569,21 @@ describe(AssetService.name, () => {
   });
 
   describe('updateAll', () => {
+    it("should not join another owner's duplicate group", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+      const { asset: theirs } = await ctx.newAsset({ ownerId: other.id, duplicateId });
+      await ctx.newExif({ assetId: theirs.id, fileSizeInByte: 1000 });
+      const { asset: mine } = await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.updateAll(factory.auth({ user }), { ids: [mine.id], duplicateId })).rejects.toThrow(
+        'Duplicate grouping can only join a group of assets you own',
+      );
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ duplicateId: null });
+    });
+
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queueAll.mockResolvedValue();
