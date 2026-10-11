@@ -3074,7 +3074,7 @@ describe(AssetService.name, () => {
 
     it('S-52: caps space resolution at MAX_ATTRIBUTION_ASSETS cross-owner ids and marks the row truncated', async () => {
       const auth = AuthFactory.create();
-      // Mirrors MAX_ATTRIBUTION_ASSETS in gallery/cross-owner-edit.ts — this pins the cap's VALUE together
+      // Mirrors MAX_ATTRIBUTION_ASSETS in gallery/cross-owner-edit.ts: this pins the cap's VALUE together
       // with its enforcement, so a change to the constant must update this test too.
       const CAP = 500;
       const ids = Array.from({ length: CAP + 1 }, () => newUuid());
