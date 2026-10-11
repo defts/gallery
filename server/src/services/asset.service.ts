@@ -41,6 +41,7 @@ import {
 } from 'src/enum.js';
 import { applyAssetResponseOverlay } from 'src/gallery/asset-response-overlay.js';
 import { applyVisibilityTransitionSideEffects } from 'src/gallery/asset-visibility-transition.service.js';
+import { logCrossOwnerEdit } from 'src/gallery/cross-owner-edit.js';
 import { updateAssetFavorites } from 'src/gallery/gallery-asset.service.js';
 import { BaseService } from 'src/services/base.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
@@ -212,7 +213,7 @@ export class AssetService extends BaseService {
     // tell the space that someone favorited a member's photo.
     const { isFavorite: _isFavorite, ...edits } = dto;
     if (dto.visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await this.logCrossOwnerEdit(auth, [id]);
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
 
     return this.get(auth, id) as Promise<AssetResponseDto>;
@@ -339,7 +340,7 @@ export class AssetService extends BaseService {
     // #763: a favorite-only write is the caller's private state, not an edit — see update().
     const { ids: _ids, isFavorite: _isFavorite, ...edits } = dto;
     if (visibility === undefined && Object.values(edits).some((value) => value !== undefined)) {
-      await this.logCrossOwnerEdit(auth, ids);
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, ids);
     }
   }
 
@@ -806,7 +807,7 @@ export class AssetService extends BaseService {
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, [id]);
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
 
     // Return the asset and its applied edits
     return {
@@ -827,6 +828,6 @@ export class AssetService extends BaseService {
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
     // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, [id]);
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
   }
 }

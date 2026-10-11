@@ -4,6 +4,7 @@ import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import { AssetType, JobName, Permission } from 'src/enum.js';
+import { logCrossOwnerEdit } from 'src/gallery/cross-owner-edit.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/video-trim.dto.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -128,7 +129,7 @@ export class GalleryAssetService extends BaseService {
     // The trimmed thumbnails are the asset's edited ones, which clients request while isEdited is set.
     await this.assetRepository.update({ id, isEdited: true });
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
-    await this.logCrossOwnerEdit(auth, [id]);
+    await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
 
     return { startTime: dto.startTime, endTime: dto.endTime, originalDuration: durationSeconds };
   }
@@ -138,7 +139,7 @@ export class GalleryAssetService extends BaseService {
 
     if (await this.videoTrimRepository.delete(id)) {
       await this.assetRepository.update({ id, isEdited: false });
-      await this.logCrossOwnerEdit(auth, [id]);
+      await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
     // The edit job removes the trimmed files and regenerates thumbnails; clients wait for its AssetEditReadyV2.
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
