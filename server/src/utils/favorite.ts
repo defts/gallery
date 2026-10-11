@@ -1,7 +1,8 @@
 // Per-user favorites overlay (#763). Correlated EXISTS against the `asset_favorite` table
 // (slice 0), replacing the old ownership-masking form `asset."isFavorite" and asset."ownerId" =
 // :me`, which could only ever be true for the asset's owner. See
-// docs/superpowers/specs/2026-07-20-per-user-favorites-design.md §5.2.
+// specs/2026-07-20-per-user-favorites-design.md §5.2. `asset."isFavorite"` is now the owner's projection
+// of this overlay; where code may still read it directly is listed in src/utils/favorite-grep-gate.spec.ts.
 //
 // Follows the correlated-EXISTS idiom established in src/utils/shared-space-album-scope.ts
 // (see `spaceDirectAssetExists` / `spaceAlbumAssetExists`): an `ExpressionBuilder<DB, keyof DB>`

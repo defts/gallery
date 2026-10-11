@@ -470,11 +470,20 @@ server on a Gallery database read every owner favorite as false, because the col
 `1798800000000-RestoreAssetIsFavoriteProjection` restores `asset."isFavorite"` with upstream's meaning,
 the owner's favorite. The overlay stays the only source of truth and the only thing Gallery writes:
 forward triggers on `asset_favorite` copy the owner's row onto the column, which also bumps
-`asset.updateId` for stock clients, and reverse triggers on `asset` turn a column write by a stock
+`asset.updateId` for stock clients, and a reverse trigger on `asset` turns a column write by a stock
 server into the owner's overlay row. This is not the rejected dual-write cache: only the triggers write
 the column, so the two cannot drift. Upstream code that is pinned to the owner (owner asset sync, the
 owner's job payloads, workflow assets, asset statistics) reads the column again; every cross-owner
 surface keeps `favoriteExistsFor(viewer)`. `src/utils/favorite-grep-gate.spec.ts` holds that line.
+
+Two constraints come with the triggers. The forward pair fires only at trigger depth 0, so no other
+trigger may write `asset_favorite` (it would leave the column stale); the grep gate checks that only
+the reverse trigger body does. And the two directions take their locks in opposite order: a Gallery
+favorite toggle locks `asset_favorite` then `asset`, a stock column write locks `asset` then
+`asset_favorite`. If a Gallery server and a stock Immich server run on the same database at the same
+time and toggle the same owner asset at the same moment, Postgres can report a deadlock and abort one
+of the two writes. The surviving state is consistent and the aborted request can be retried. Gallery
+traffic alone never takes the locks in the reverse order, because Gallery never writes the column.
 
 ### 8.1 On the deprecated alias
 
