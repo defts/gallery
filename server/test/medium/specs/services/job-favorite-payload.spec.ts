@@ -46,11 +46,10 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) })],
-      expect.any(Array),
+      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: true }) }),
     );
   });
 
@@ -71,11 +70,10 @@ describe('JobService AssetEditReadyV2 favorite staleness (#763)', () => {
       data: { id: asset.id },
     });
 
-    expect(ctx.getMock(WebsocketRepository).clientSendByClient).toHaveBeenCalledWith(
+    expect(ctx.getMock(WebsocketRepository).clientSend).toHaveBeenCalledWith(
       'AssetEditReadyV2',
       owner.id,
-      [expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) })],
-      expect.any(Array),
+      expect.objectContaining({ asset: expect.objectContaining({ isFavorite: false }) }),
     );
   });
 });
