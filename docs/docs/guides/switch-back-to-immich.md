@@ -21,6 +21,36 @@ Assets you uploaded through Gallery are preserved, as long as they exist in Immi
 **The right answer is to restore the `pg_dump` you took before switching to Gallery.** Use this script only if you skipped that step.
 :::
 
+## Trying Immich first
+
+Upstream Immich also starts on a Gallery database without the cleanup script. You can use that to try Immich for a while and then go back to Gallery with nothing lost. Gallery's automated tests run this round trip and check that the data is intact afterwards.
+
+1. Back up your database as in [step 1](#1-back-up-your-database).
+2. Open **Administration > Job Queues** and wait until no queue has active or waiting jobs. Stop the Gallery containers as in [step 2](#2-stop-the-gallery-stack), including the Redis flush.
+3. Turn off Gallery's workflow plugin. Immich cannot load it and does not start while it is on:
+
+   ```bash
+   docker exec immich_postgres psql -U postgres -d immich \
+     -c "UPDATE plugin SET enabled = false WHERE name = 'gallery-core';"
+   ```
+
+   Do not delete the plugin instead: that also deletes every workflow step that uses a Gallery action.
+
+4. Switch the image to Immich as in [step 5](#5-switch-your-compose-file-to-upstream-immich) and start the stack.
+
+Immich shows each user their own photos and videos, with their own favorites. A trimmed video plays at full length and shows its full duration, but its thumbnail is still taken from the trimmed part. Immich's schema check warns about Gallery's database functions; that warning is expected here.
+
+Never run Gallery and Immich on the same database at the same time. If both change the favorite on the same photo at the same moment, the database can stop one of the two changes with a deadlock error.
+
+To go back to Gallery, wait until Immich's job queues are empty, stop Immich, flush Redis again, turn the plugin back on with `UPDATE plugin SET enabled = true WHERE name = 'gallery-core';`, switch the image back to Gallery and start the stack. Favorites you changed in Immich carry over.
+
+To stay on Immich, you still have to run the cleanup script below. Without it, these problems remain, and they also apply while you try Immich:
+
+- Share links made from a space keep showing other members' photos, even after those members leave the space.
+- Files stored in S3 do not load.
+- The Immich mobile app stops syncing when it receives a rule memory, which it cannot read.
+- Pets show up as people.
+
 ## Before you start
 
 ### Move files out of S3
