@@ -263,9 +263,9 @@ if [[ -f "$app_download_modal" ]]; then
   fi
 fi
 
-# Check Dockerfiles for upstream repo references
+# Check Dockerfiles and the dev compose file for upstream repo references
 echo "--- Checking Dockerfiles ---"
-for dockerfile in "server/Dockerfile" "machine-learning/Dockerfile"; do
+for dockerfile in "server/Dockerfile" "machine-learning/Dockerfile" "docker/docker-compose.dev.yml"; do
   filepath="$REPO_ROOT/$dockerfile"
   if [[ -f "$filepath" ]]; then
     if grep -q "immich-app/immich" "$filepath"; then

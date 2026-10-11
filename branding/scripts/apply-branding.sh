@@ -915,6 +915,8 @@ patch_docker() {
       # Replace upstream image references
       sed -i "s|ghcr\.io/immich-app/immich-server|${DOCKER_REGISTRY}/${DOCKER_SERVER_IMAGE}|g" "$f"
       sed -i "s|ghcr\.io/immich-app/immich-machine-learning|${DOCKER_REGISTRY}/${DOCKER_ML_IMAGE}|g" "$f"
+      # Package page first: the generic repo rewrite below would keep the upstream package name.
+      sed -i "s|immich-app/immich/pkgs/container/immich-server|${REPO_NAME}/pkgs/container/${DOCKER_SERVER_IMAGE}|g" "$f"
       # Replace upstream repo references in environment variables
       sed -i "s|immich-app/immich|${REPO_NAME}|g" "$f"
       echo "  Patched $(basename "$f")"
