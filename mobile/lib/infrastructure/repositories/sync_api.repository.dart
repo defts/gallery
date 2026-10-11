@@ -248,7 +248,16 @@ class SyncApiRepository {
         continue;
       }
 
-      data.add(SyncEvent(type: type, data: converter(dataJson), ack: ack));
+      // An older server can send a value this client's enums no longer know (an `AssetEditV1` 'trim' row);
+      // skipping that one line keeps the rest of the stream syncing.
+      final Object event;
+      try {
+        event = converter(dataJson);
+      } catch (error) {
+        _logger.warning("Skipping undecodable $type line: $error");
+        continue;
+      }
+      data.add(SyncEvent(type: type, data: event, ack: ack));
     }
 
     return data;
