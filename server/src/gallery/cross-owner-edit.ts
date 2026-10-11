@@ -6,17 +6,12 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { checkAccess } from 'src/utils/access.js';
 
-// Bounds how many cross-owner ids logCrossOwnerEdit will resolve a space for, per bulk edit:
-// it does NOT bound how many assets a user may edit. A bulk edit can carry an id list large
-// enough that resolving a space (a two-subquery UNION join) for every cross-owner id would fan
-// one request out into tens of thousands of heavy queries; logCrossOwnerEdit is best-effort
-// activity-feed attribution whose failure is already swallowed, so it is the one place in this
-// feature safe to degrade under a huge selection. Never apply this constant to AssetBulkUpdateDto
-// or to POST /assets/editable: both must answer for the user's whole selection.
+// Bounds the space lookups for activity attribution only, not the edit itself. Never apply it to
+// AssetBulkUpdateDto or POST /assets/editable: both must answer for the whole selection.
 const MAX_ATTRIBUTION_ASSETS = 500;
 
 /**
- * #734: record an edit made by someone who is not the asset owner, so the owner can see
+ * Records an edit made by someone who is not the asset owner, so the owner can see
  * what changed and who changed it. Owner self-edits (nearly all editing) log nothing,
  * which is what keeps this low-volume.
  *
@@ -33,19 +28,8 @@ export const logCrossOwnerEdit = async (
   auth: AuthDto,
   assetIds: string[],
 ): Promise<void> => {
-  // assetIds arrives here via a zod-validated DTO, so it's already guaranteed to be a real
-  // array; this check is defence in depth at the helper boundary, not a suspicion that the
-  // DTO lies. It also matters for static analysis: it's what makes the chunking below
-  // provably bounded rather than relying on a `.length` that isn't necessarily an array's own.
-  if (!Array.isArray(assetIds)) {
-    return;
-  }
-
   try {
-    // Which of these does the caller own? AssetDelete is the pure owner arm, the same
-    // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
-    // takes an asset id, so the owner id itself is never needed, and a bulk edit should not pay
-    // for a full asset read just to decide whether to write an activity row.
+    // AssetDelete has no Gallery grant, so it answers "does the caller own it" without reading the assets.
     const ownedIds = await checkAccess(accessRepository, { auth, permission: Permission.AssetDelete, ids: assetIds });
     const crossOwnerIds = assetIds.filter((id) => !ownedIds.has(id));
     if (crossOwnerIds.length === 0) {
