@@ -339,6 +339,44 @@ describe(DuplicateService.name, () => {
       await expect(ctx.get(AssetRepository).getById(theirs.id)).resolves.toMatchObject({ deletedAt: null });
     });
 
+    it("should not write onto another owner's keeper in a group the caller joined", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+
+      const theirs = await newDuplicateAsset(ctx, { ownerId: other.id, duplicateId }, { description: 'theirs' });
+      // PUT /assets lets the caller set any duplicateId on an asset they own, so they can join another owner's group.
+      const mine = await newDuplicateAsset(
+        ctx,
+        { ownerId: user.id, duplicateId, isFavorite: true },
+        { description: 'mine' },
+      );
+      const tag = await newTag(ctx, user.id, 'mine');
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [mine.id] });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const results = await sut.resolve(auth, {
+        groups: [{ duplicateId, keepAssetIds: [theirs.id], trashAssetIds: [mine.id] }],
+      });
+
+      await expect(ctx.get(AssetRepository).getById(theirs.id, { exifInfo: true, tags: true })).resolves.toMatchObject({
+        isFavorite: false,
+        duplicateId,
+        exifInfo: { description: 'theirs' },
+        tags: [],
+      });
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ deletedAt: null });
+      expect(results).toEqual([
+        {
+          id: duplicateId,
+          success: false,
+          error: BulkIdErrorReason.NO_PERMISSION,
+          errorMessage: 'No permission to update assets',
+        },
+      ]);
+    });
+
     it('should resolve several groups in one request', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();

@@ -61,6 +61,8 @@ describe(DuplicateService.name, () => {
     // (idsToKeep.length === 1 && idsToTrash.length > 0) don't need to know about the favorite
     // union unless they're specifically asserting on it.
     mocks.assetFavorite.mergeOnto.mockResolvedValue(undefined as any);
+    // resolve requires owning the keepers and the trashed copies; grant every requested id unless a test overrides it.
+    mocks.access.asset.checkOwnerAccess.mockImplementation((_userId, ids) => Promise.resolve(new Set(ids)));
   });
 
   it('should work', () => {
@@ -709,7 +711,6 @@ describe(DuplicateService.name, () => {
       const checksum2 = Buffer.from('aabb', 'hex');
       const checksum3 = Buffer.from('ccdd', 'hex');
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id, asset3.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],
@@ -736,7 +737,6 @@ describe(DuplicateService.name, () => {
       const asset3 = AssetFactory.create();
       const checksum = Buffer.from('eeff', 'hex');
       mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset3.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
         assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],

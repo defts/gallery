@@ -155,6 +155,20 @@ export class DuplicateService extends BaseService {
       }
     }
 
+    // Gallery: a group can hold another owner's asset (joined through PUT /assets before it checked the group). Every
+    // write below lands on the keepers, and the merged data comes from them and the trashed copies checked above, so
+    // all must be the caller's own. AssetDelete is the owner-only arm; AssetUpdate also admits a space editor, whose
+    // favorite and visibility would land on the owner's columns.
+    const ownedKeepIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: idsToKeep });
+    if (ownedKeepIds.size !== new Set(idsToKeep).size) {
+      return {
+        id: duplicateId,
+        success: false,
+        error: BulkIdErrorReason.NO_PERMISSION,
+        errorMessage: 'No permission to update assets',
+      };
+    }
+
     // Sync shared space membership: add the keeper(s) to any space the group's
     // assets were in, provided the auth user has Editor+ role there. Placed
     // before any other mutation so partial-failure blast radius is minimal —
