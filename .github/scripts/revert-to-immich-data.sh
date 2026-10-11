@@ -4,7 +4,7 @@
 #
 #   revert-to-immich-data.sh seed            Gallery server running on :2283
 #   revert-to-immich-data.sh stock-prepare   no server running; the switch-back guide's steps for a trial boot
-#   revert-to-immich-data.sh stock-assert DRIFT BASELINE
+#   revert-to-immich-data.sh stock-assert DRIFT BASELINE REVERT_SQL
 #                                            stock Immich running on the Gallery database, no revert
 #   revert-to-immich-data.sh gallery-prepare no server running; the guide's steps for going back to Gallery
 #   revert-to-immich-data.sh gallery-assert  Gallery running again on the same database
@@ -245,7 +245,7 @@ bull_add() {
 
 # shellcheck disable=SC2153 # vars come from the sourced $STATE file
 stock_assert() {
-  local drift=$1 baseline=$2
+  local drift=$1 baseline=$2 revert_sql=$3
   # shellcheck source=/dev/null
   . "$STATE"
   failed=0
@@ -254,12 +254,18 @@ stock_assert() {
 
   # Stock's drift check flags only Gallery's trigger functions and Gallery's migration_overrides rows: extra
   # tables (with their constraints), columns, indexes and triggers are ignored by design. No migration
-  # issue either: Gallery records its own migrations outside kysely_migrations.
+  # issue either: Gallery records its own migrations outside kysely_migrations. The allowed items are the
+  # functions and override rows the revert script removes, so a new one must reach the script first.
   comm -23 "$drift" "$baseline" >"$STATE_DIR/drift-stock-new.txt"
   echo "Stock drift on the Gallery database, beyond the fresh-install baseline:"
   cat "$STATE_DIR/drift-stock-new.txt"
-  check stock 'drift is only Gallery functions and their overrides' \
-    "$(grep -vE '^  - (FunctionDrop|OverrideDrop): ' "$STATE_DIR/drift-stock-new.txt" || true)" ''
+  {
+    sed -nE 's/^DROP FUNCTION IF EXISTS ([a-z_]+)\(.*/FunctionDrop \1/p' "$revert_sql"
+    grep -oE "'(function|trigger|index)_[A-Za-z0-9_]+'" "$revert_sql" | tr -d "'" | sed 's/^/OverrideDrop /'
+  } | sort -u >"$STATE_DIR/drift-allowed.txt"
+  check stock 'drift is only the Gallery functions and override rows the revert script removes' \
+    "$(sed -E 's/^  - FunctionDrop: The function "([^"]+)".*/FunctionDrop \1/; s/^  - OverrideDrop: The override "([^"]+)".*/OverrideDrop \1/' \
+      "$STATE_DIR/drift-stock-new.txt" | sort -u | comm -23 - "$STATE_DIR/drift-allowed.txt")" ''
 
   check stock 'own photo served' "$(api GET "/assets/$PHOTO_A" "$owner" | jq -r .ownerId)" "$OWNER_ID"
   check stock 'owner favorite shown' "$(api GET "/assets/$PHOTO_A" "$owner" | jq -r .isFavorite)" true
@@ -267,6 +273,16 @@ stock_assert() {
   check stock 'trimmed video shows its original duration' "$(api GET "/assets/$VIDEO" "$owner" | jq -r .duration)" "$ORIGINAL_DURATION"
   # Stock web then asks for the edited thumbnail, which Gallery made from the trimmed part.
   check stock 'trimmed video keeps its edited thumbnail' "$(api GET "/assets/$VIDEO" "$owner" | jq -r .isEdited)" true
+  api GET "/assets/$VIDEO/thumbnail?edited=true" "$owner" >"$STATE_DIR/stock-poster-edited"
+  api GET "/assets/$VIDEO/thumbnail?edited=false" "$owner" >"$STATE_DIR/stock-poster-original"
+  check stock 'trimmed video poster differs from the untrimmed one' \
+    "$(cmp -s "$STATE_DIR/stock-poster-edited" "$STATE_DIR/stock-poster-original" || echo differs)" differs
+  # Stock plays the original file: upstream reads only the unedited encoded video.
+  api GET "/assets/$VIDEO/video/playback" "$owner" >"$STATE_DIR/stock-playback.mp4"
+  docker cp "$STATE_DIR/stock-playback.mp4" server:/tmp/stock-playback.mp4
+  check stock 'trimmed video plays at full length' \
+    "$(docker exec server ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/stock-playback.mp4 |
+      awk '{ printf "%.0f", $1 }')" "$(((ORIGINAL_DURATION + 500) / 1000))"
   local bucket
   bucket=$(api GET '/timeline/bucket?timeBucket=2024-01-01&visibility=timeline' "$owner")
   check stock 'timeline holds the owner photos and video' \
@@ -419,10 +435,10 @@ assert() {
 case ${1:-} in
   seed) seed ;;
   stock-prepare) stock_prepare ;;
-  stock-assert) stock_assert "${2:?stock drift file}" "${3:?baseline drift file}" ;;
+  stock-assert) stock_assert "${2:?stock drift file}" "${3:?baseline drift file}" "${4:?path to revert-to-immich.sql}" ;;
   gallery-prepare) gallery_prepare ;;
   gallery-assert) gallery_assert ;;
   s3-guard) s3_guard "${2:?path to revert-to-immich.sql}" ;;
   assert) assert ;;
-  *) fail "usage: $0 seed | stock-prepare | stock-assert <drift> <baseline> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert" ;;
+  *) fail "usage: $0 seed | stock-prepare | stock-assert <drift> <baseline> <revert-to-immich.sql> | gallery-prepare | gallery-assert | s3-guard <revert-to-immich.sql> | assert" ;;
 esac
