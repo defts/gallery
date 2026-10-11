@@ -1075,8 +1075,8 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
     ...comparisonPredicates(eb, 'asset.libraryId', branch.libraryId),
     ...comparisonPredicates(eb, 'asset.type', branch.type),
     ...comparisonPredicates(eb, 'asset.visibility', branch.visibility),
-    // #763: favorites are a per-user overlay (asset_favorite) — the raw `asset.isFavorite` column
-    // this used to compare against was dropped in slice 3. Resolved for the CALLER, mirroring
+    // #763: favorites are a per-user overlay (asset_favorite); `asset.isFavorite` holds only the
+    // owner's, and V3 scopes by partners too. Resolved for the CALLER, mirroring
     // searchAssetBuilderLegacy's isFavorite arm above. V3 is dormant in the fork (see the
     // coexistence spec), so `authUserId` has no live caller yet; whoever wires V3 to an endpoint
     // must thread it, exactly as the legacy path already does.

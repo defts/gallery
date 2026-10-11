@@ -181,7 +181,7 @@ export class MemoryRuleAssetRepository {
   ): Promise<MemoryPeriodAsset[]> {
     // #763: favorites are a per-user overlay row, not a column on the asset. Memory generation is
     // owner-scoped (`asset.ownerId = ownerId` below), so the owner's own overlay row is exactly what
-    // the dropped `asset.isFavorite` column used to carry here — both for the projection and for the
+    // `asset.isFavorite` projects, both for the projection and for the
     // `favoritesOnly` filter. `$narrowType` pins the EXISTS result to `boolean`: Kysely types it
     // `SqlBool` (`boolean | number`), which does not satisfy `MemoryPeriodAsset.isFavorite`, but the
     // pg driver only ever returns a boolean for it.

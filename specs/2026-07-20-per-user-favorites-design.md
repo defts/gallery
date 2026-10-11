@@ -465,6 +465,17 @@ Recorded so `/impl-loop` does not relitigate them.
 | Write API                 | Dedicated endpoint **+ deprecated alias**                 | Alias-free: breaks third-party API consumers. Guard-relaxation-only: one missed field is privilege escalation       |
 | Sibling actions           | Favorite only; pattern documented (§11.1)                 | All three: archive drags in trash/visibility semantics                                                              |
 
+**Revised (2026-10-11): the column is back as a trigger-maintained owner projection.** A stock Immich
+server on a Gallery database read every owner favorite as false, because the column was gone. Migration
+`1798800000000-RestoreAssetIsFavoriteProjection` restores `asset."isFavorite"` with upstream's meaning,
+the owner's favorite. The overlay stays the only source of truth and the only thing Gallery writes:
+forward triggers on `asset_favorite` copy the owner's row onto the column, which also bumps
+`asset.updateId` for stock clients, and reverse triggers on `asset` turn a column write by a stock
+server into the owner's overlay row. This is not the rejected dual-write cache: only the triggers write
+the column, so the two cannot drift. Upstream code that is pinned to the owner (owner asset sync, the
+owner's job payloads, workflow assets, asset statistics) reads the column again; every cross-owner
+surface keeps `favoriteExistsFor(viewer)`. `src/utils/favorite-grep-gate.spec.ts` holds that line.
+
 ### 8.1 On the deprecated alias
 
 The alias (`UpdateAssetDto.isFavorite`, `AssetBulkUpdateDto`) is **not** a second authorization

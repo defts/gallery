@@ -254,9 +254,7 @@ describe(AssetService.name, () => {
     });
 
     // #763 slice 7 (E20): copy carries the ACTING user's own overlay row for the source, not the
-    // raw (now-legacy) asset.isFavorite column — `ctx.newAsset({ isFavorite: true })` only seeds
-    // that column for backfill-style fixtures, so the acting user must ALSO hold a real
-    // asset_favorite row on the source for it to transfer.
+    // owner's favorite that asset.isFavorite projects.
     it('should copy favorite status for the acting user', async () => {
       const { sut, ctx } = setup();
       const assetFavoriteRepo = ctx.get(AssetFavoriteRepository);

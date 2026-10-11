@@ -30,8 +30,8 @@ const setup = (db?: Kysely<DB>) => {
       AlbumRepository,
       AssetRepository,
       // gallery-fork (#763): per-user favorites live in their own overlay table, so the keeper's
-      // merged favorite is written by AssetFavoriteRepository.mergeOnto rather than an
-      // asset."isFavorite" column. Real rather than mocked: 'should merge isFavorite into the
+      // merged favorite is written by AssetFavoriteRepository.mergeOnto, for every user who favorited
+      // a source. Real rather than mocked: 'should merge isFavorite into the
       // keeper' asserts the merged row is readable back through AssetRepository.getById.
       AssetFavoriteRepository,
       ConfigRepository,

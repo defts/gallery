@@ -165,6 +165,7 @@ const assetEntity = Object.freeze({
   fileModifiedAt: new Date('2022-06-19T23:41:36.910Z'),
   fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
   updatedAt: new Date('2022-06-19T23:41:36.910Z'),
+  isFavorite: false,
   duration: null,
   files: [] as AssetFile[],
   exifInfo: {
@@ -172,7 +173,7 @@ const assetEntity = Object.freeze({
     longitude: 10.703075,
   },
   livePhotoVideoId: null,
-} as MapAsset);
+} as MapAsset & { isFavorite: boolean });
 
 const existingAsset = Object.freeze({
   ...assetEntity,

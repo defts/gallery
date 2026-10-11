@@ -161,11 +161,7 @@ export class JobService extends BaseService {
               duration: asset.duration,
               type: asset.type,
               deletedAt: asset.deletedAt,
-              // #763: OWNER-scoped — assetRepository.getById/getByIdsWithAllRelationsButStacks
-              // project `isFavorite` from favoriteExistsForOwner (SqlBool), not a plain boolean;
-              // both events here are always sent to the asset's owner, so this IS the correct
-              // value, just needing the same `!!` normalization mapAsset applies elsewhere.
-              isFavorite: !!asset.isFavorite,
+              isFavorite: asset.isFavorite,
               visibility: asset.visibility,
               livePhotoVideoId: asset.livePhotoVideoId,
               stackId: asset.stackId,
@@ -241,11 +237,7 @@ export class JobService extends BaseService {
                 duration: asset.duration,
                 type: asset.type,
                 deletedAt: asset.deletedAt,
-                // #763: OWNER-scoped — assetRepository.getById/getByIdsWithAllRelationsButStacks
-                // project `isFavorite` from favoriteExistsForOwner (SqlBool), not a plain boolean;
-                // both events here are always sent to the asset's owner, so this IS the correct
-                // value, just needing the same `!!` normalization mapAsset applies elsewhere.
-                isFavorite: !!asset.isFavorite,
+                isFavorite: asset.isFavorite,
                 visibility: asset.visibility,
                 livePhotoVideoId: asset.livePhotoVideoId,
                 stackId: asset.stackId,

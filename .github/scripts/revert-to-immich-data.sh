@@ -116,6 +116,9 @@ seed() {
   # photo_a: owner and member favorite. photo_b: only the member (not the owner) favorites.
   api PUT /assets "$owner" "{\"ids\":[\"$photo_a\"],\"isFavorite\":true}" >/dev/null
   api PUT /assets "$member" "{\"ids\":[\"$photo_a\",\"$photo_b\"],\"isFavorite\":true}" >/dev/null
+  # asset.isFavorite is the owner's projection of those rows, which a stock server reads.
+  [ "$(psql_q "SELECT string_agg(\"isFavorite\"::text, ',' ORDER BY id = '$photo_b') FROM asset WHERE id IN ('$photo_a', '$photo_b')")" = true,false ] ||
+    fail "seed: asset.isFavorite does not project the owner's favorites"
 
   api POST /memories "$owner" \
     "{\"type\":\"rule\",\"data\":{\"title\":\"Rule\"},\"memoryAt\":\"2024-01-01T00:00:00.000Z\",\"assetIds\":[\"$photo_a\"]}" \
@@ -255,6 +258,9 @@ assert() {
   check assert 'original downloads' "$(api GET "/assets/$PHOTO_A/original" "$owner" | sha1sum | cut -d' ' -f1)" "$PHOTO_A_SHA"
   check assert 'owner favorite kept' "$(api GET "/assets/$PHOTO_A" "$owner" | jq -r .isFavorite)" true
   check assert 'non-owner favorite not promoted' "$(api GET "/assets/$PHOTO_B" "$owner" | jq -r .isFavorite)" false
+  # A Gallery trigger left on asset would make this write fail once asset_favorite is gone.
+  check assert 'stock favorite toggle works' "$(api PUT "/assets/$PHOTO_B" "$owner" '{"isFavorite":true}' | jq -r .isFavorite)" true
+  check assert 'stock unfavorite works' "$(api PUT "/assets/$PHOTO_B" "$owner" '{"isFavorite":false}' | jq -r .isFavorite)" false
 
   check assert 'pet person removed' "$(psql_q "SELECT count(*) FROM person WHERE name = 'Revert Pet'")" 0
   check assert 'pet faces removed' "$(psql_q "SELECT count(*) FROM asset_face WHERE \"assetId\" = '$PHOTO_B'")" 0
