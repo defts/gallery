@@ -4,7 +4,7 @@
 
 Gallery supports disk and S3 storage backends simultaneously. On S3, asset and file paths stored in the database are relative keys (e.g. `upload/<uuid>/a4/c2/<uuid>.MP4`). Code that passes these directly to local-FS or local-process operations (`fs.*`, `fluent-ffmpeg`, `exiftool-vendored`, `sharp`) resolves them against the process CWD and fails with `ENOENT`.
 
-The repository already has an `ensureLocalFile(path)` helper that branches on `isAbsolute` — returning the path unchanged for disk, and `{ localPath: tempPath, cleanup }` via `StorageService.backendFor(key).downloadToTemp(key)` for S3. Today it is duplicated verbatim in:
+The repository already has an `ensureLocalFile(path)` helper that branches on `isAbsolute`, returning the path unchanged for disk, and `{ localPath: tempPath, cleanup }` via `StorageService.backendFor(key).downloadToTemp(key)` for S3. Today it is duplicated verbatim in:
 
 - `server/src/services/media.service.ts:80`
 - `server/src/services/metadata.service.ts:184`
