@@ -36,7 +36,7 @@ export class TrimManager implements EditToolManager {
     });
     if (trim) {
       // asset.duration is the trimmed length; the timeline spans the original so the trim can be widened again.
-      this.duration = Math.max(trim.originalDuration, this.duration);
+      this.duration = trim.originalDuration;
       this.startTime = trim.startTime;
       this.endTime = trim.endTime;
       this.hasChanges = true;

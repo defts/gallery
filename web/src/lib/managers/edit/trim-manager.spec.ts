@@ -187,15 +187,6 @@ describe('TrimManager', () => {
       await expect(manager.onActivate(assetWithDuration(30_000))).rejects.toThrow('offline');
     });
 
-    it('should not shrink duration if originalDuration is smaller than asset duration', async () => {
-      // Edge case: originalDuration is somehow less than current — use the larger value
-      mockTrim(5, 15, 10);
-      await manager.onActivate(assetWithDuration(20_000));
-
-      // asset.duration (20s) > originalDuration (10s) — keep 20s
-      expect(manager.duration).toBe(20);
-    });
-
     it('should store the widened range after widening a previous trim', async () => {
       mockTrim(30, 90, 120);
       await manager.onActivate(assetWithDuration(60_000));
