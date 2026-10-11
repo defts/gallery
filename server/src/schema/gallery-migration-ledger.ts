@@ -10,7 +10,9 @@ import { LoggingRepository } from 'src/repositories/logging.repository.js';
 const GALLERY_MIGRATION_TABLE = 'gallery_migrations';
 
 // Names recorded by earlier builds that have no file any more, mapped to the current name of the same
-// migration, or to null when the row is simply dropped.
+// migration, or to null when the row is simply dropped. Applied to `kysely_migrations` rows only, since every rename
+// here predates `gallery_migrations`; renaming a fork migration that shipped after the split needs the loop below to
+// run on `gallery_migrations` too, or the newer-release refusal fires.
 const renamedMigrations: Record<string, string | null> = {
   // Upstream re-timestamped this migration (immich-28191) after Gallery databases had recorded it.
   // The migration file also keeps a fork no-op guard for an already-integer column, as a fallback.

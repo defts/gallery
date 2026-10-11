@@ -19,10 +19,10 @@ read the trimmed length from `asset.duration` and played the full-length file, a
 `editing.dto.ts`, the edit sync stream and the `AssetEditReadyV2` payload forked. Owner decision: trim
 gets its own endpoint. Sections 1 and 5 below describe the original design; what replaced them:
 
-- Storage: `asset_video_trim` (`id`, `assetId` unique, `startTime`, `endTime` in seconds, `duration` in
+- Storage: `asset_video_trim` (`assetId` primary key, `startTime`, `endTime` in seconds, `duration` in
   ms, the probed length of the trimmed file, null until the job ran). `asset.duration` holds the
-  original's length again. Migration `1798900000000-MoveVideoTrimToSidecar` moves existing trims,
-  keeps their `asset_edit` ids and restores the original duration.
+  original's length again. Migration `1798900000000-MoveVideoTrimToSidecar` moves existing trims
+  and restores the original duration.
 - API: `GET`, `PUT` and `DELETE /assets/{id}/trim` (`GalleryAssetController`, same permissions as the
   edit routes). `PUT` sets `asset.isEdited`, because the trimmed thumbnails are the edited ones;
   `DELETE` clears it. Both queue `AssetEditThumbnailGeneration`, so clients still wait for

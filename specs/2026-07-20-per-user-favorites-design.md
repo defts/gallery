@@ -486,7 +486,7 @@ favorite toggle locks `asset_favorite` then `asset`, a stock column write locks 
 time and toggle the same owner asset at the same moment, Postgres can report a deadlock and abort one
 of the two writes. The surviving state is consistent and the aborted request can be retried. Gallery
 traffic alone takes the column-first order only in upstream's owner-only writes, so it can deadlock only
-when an upload, copy or duplicate resolve races the owner's favorite toggle of the same asset.
+when a copy or duplicate resolve races the owner's favorite toggle of the same asset.
 
 ### 8.1 On the deprecated alias
 
