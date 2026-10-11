@@ -1,5 +1,5 @@
 import { GalleryPluginService } from 'src/gallery/gallery-plugin.service.js';
-import { newTestService, ServiceMocks } from 'test/utils.js';
+import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe(GalleryPluginService.name, () => {
   let sut: GalleryPluginService;

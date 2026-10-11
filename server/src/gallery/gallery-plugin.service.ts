@@ -20,7 +20,7 @@ export class GalleryPluginService extends BaseService {
     }
 
     const loaded = await this.pluginRepository.getForLoad();
-    if (!loaded.some(({ name }) => name === GALLERY_PLUGIN)) {
+    if (loaded.every(({ name }) => name !== GALLERY_PLUGIN)) {
       this.logger.warn(
         `The ${GALLERY_PLUGIN} plugin is disabled, so workflows with a Gallery step fail. ` +
           `Re-enable it with: UPDATE plugin SET enabled = true WHERE name = '${GALLERY_PLUGIN}';`,
