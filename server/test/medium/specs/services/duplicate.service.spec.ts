@@ -364,6 +364,9 @@ describe(DuplicateService.name, () => {
         groups: [{ duplicateId, keepAssetIds: [theirs.id], trashAssetIds: [mine.id] }],
       });
 
+      await expect(
+        ctx.database.selectFrom('shared_space_asset').select('assetId').where('spaceId', '=', space.id).execute(),
+      ).resolves.toEqual([{ assetId: mine.id }]);
       await expect(ctx.get(AssetRepository).getById(theirs.id, { exifInfo: true, tags: true })).resolves.toMatchObject({
         isFavorite: false,
         duplicateId,
@@ -379,9 +382,6 @@ describe(DuplicateService.name, () => {
           errorMessage: 'No permission to update assets',
         },
       ]);
-      await expect(
-        ctx.database.selectFrom('shared_space_asset').select('assetId').where('spaceId', '=', space.id).execute(),
-      ).resolves.toEqual([{ assetId: mine.id }]);
     });
 
     it('should resolve several groups in one request', async () => {
