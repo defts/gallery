@@ -35,8 +35,8 @@ where
         from
           "shared_space_album"
           inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
           "shared_space_member"."userId" = $5::uuid
@@ -59,8 +59,8 @@ where
           "shared_space_album"
           inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
           and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
           "shared_space_member"."userId" = $7::uuid
@@ -132,8 +132,8 @@ where
         from
           "shared_space_album"
           inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
           "shared_space_member"."userId" = $5::uuid
@@ -156,8 +156,8 @@ where
           "shared_space_album"
           inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
           and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
           "shared_space_member"."userId" = $7::uuid

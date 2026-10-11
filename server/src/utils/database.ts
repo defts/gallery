@@ -53,7 +53,7 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { hasAllPeople, hasAnyPeople } from 'src/utils/people-filter.js';
 import { fromChecksum } from 'src/utils/request.js';
-import { spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import { albumMembership, spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyConfig => {
@@ -389,55 +389,22 @@ export function inSharedAlbum(eb: ExpressionBuilder<DB, 'asset'>, userId: string
 export function inAlbums<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   albumIds: string[],
-  // #764: when the viewer has live member-spaces (timelineSpaceIds, resolved from
-  // getSpaceIdsForTimeline), cross-owner contributions (`album_space_asset`) tethered to one of those
-  // spaces count as album membership too. Gating on timelineSpaceIds — not raw album membership — is
-  // the live-membership check: an album owner who has LEFT the space passes AlbumRead on their own
-  // album but has no timelineSpaceId for it, so contributions are excluded (no permanent-grant leak).
+  // #764: contributions count as album membership only through the viewer's live member-spaces
+  // (timelineSpaceIds, from getSpaceIdsForTimeline). An album owner who LEFT the space still passes
+  // AlbumRead on their own album but has no timelineSpaceId for it, so contributions are excluded.
   timelineSpaceIds?: string[],
 ) {
-  const includeContributions = !!timelineSpaceIds && timelineSpaceIds.length > 0;
   return qb.innerJoin(
     (eb) =>
       eb
-        .selectFrom((inner) => {
-          const albumAssetMembers = inner
-            .selectFrom('album_asset')
-            .select(['album_asset.assetId as assetId', 'album_asset.albumId as albumId'])
-            .where('album_asset.albumId', '=', anyUuid(albumIds!));
-          return (
-            includeContributions
-              ? albumAssetMembers.unionAll(
-                  inner
-                    .selectFrom('album_space_asset')
-                    .select(['album_space_asset.assetId as assetId', 'album_space_asset.albumId as albumId'])
-                    .where('album_space_asset.albumId', '=', anyUuid(albumIds!))
-                    .where('album_space_asset.spaceId', '=', anyUuid(timelineSpaceIds!))
-                    // Task 9 (D1-b residue): timelineSpaceIds only proves the searcher has a live SPACE
-                    // membership — it does not prove this album is still LINKED to that space. A
-                    // contribution row survives an unlink (D1-b tombstoning applies to other read arms,
-                    // not this row), so without this gate a live member searching with an album filter
-                    // still matched a retained contribution of an UNLINKED album, which then 403s on
-                    // thumbnail (checkAccess routes through the live-link-gated spaceContributedAssetExists).
-                    // Mirrors contributionVisibleToMember (sync.repository.ts) / spaceContributedAssetExists
-                    // (shared-space-album-scope.ts): require a live shared_space_album correlated on BOTH
-                    // albumId AND spaceId.
-                    .where((wb) =>
-                      wb.exists(
-                        wb
-                          .selectFrom('shared_space_album')
-                          .whereRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
-                          .whereRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId')
-                          .select(wb.lit(1).as('one')),
-                      ),
-                    ),
-                )
-              : albumAssetMembers
-          ).as('album_members');
-        })
-        .select('album_members.assetId')
-        .groupBy('album_members.assetId')
-        .having((eb) => eb.fn.count('album_members.albumId').distinct(), '=', albumIds.length)
+        .selectFrom(
+          albumMembership(eb, albumIds, timelineSpaceIds?.length ? { spaceIds: timelineSpaceIds } : undefined).as(
+            'album_asset',
+          ),
+        )
+        .select('assetId')
+        .groupBy('assetId')
+        .having((eb) => eb.fn.count('albumId').distinct(), '=', albumIds.length)
         .as('has_album'),
     (join) => join.onRef('has_album.assetId', '=', 'asset.id'),
   );

@@ -416,32 +416,40 @@ from
   "asset"
   inner join (
     select
+      "album_asset"."albumId" as "albumId",
       "album_asset"."assetId" as "assetId"
     from
       "album_asset"
     where
-      "album_asset"."albumId" = $1::uuid
+      "album_asset"."albumId" = any ($1::uuid[])
     union
     select
+      "album_space_asset"."albumId" as "albumId",
       "album_space_asset"."assetId" as "assetId"
     from
-      "album_space_asset"
+      "shared_space_album"
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+      inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+      and "linked_album"."deletedAt" is null
+      inner join "asset" on "asset"."id" = "album_space_asset"."assetId"
     where
-      "album_space_asset"."albumId" = $2::uuid
-      and "album_space_asset"."spaceId" = $3::uuid
+      "shared_space_album"."spaceId" = $2::uuid
+      and "asset"."visibility" in ($3, $4)
+      and "album_space_asset"."albumId" = any ($5::uuid[])
   ) as "album_members" on "album_members"."assetId" = "asset"."id"
   inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
 where
   "asset"."deletedAt" is null
-  and "asset"."isOffline" = $4
+  and "asset"."isOffline" = $6
 group by
   "asset"."id"
 order by
   "asset"."id"
 limit
-  $5
+  $7
 offset
-  $6
+  $8
 
 -- AssetRepository.getByLibraryIdAndOriginalPath
 select
@@ -1058,8 +1066,8 @@ where
         from
           "shared_space_album"
           inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
         where
           "album_asset"."assetId" = "asset"."id"
           and "shared_space_album"."spaceId" = any ($5::uuid[])
@@ -1072,8 +1080,8 @@ where
           "shared_space_album"
           inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
           and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-          inner join "album" on "album"."id" = "shared_space_album"."albumId"
-          and "album"."deletedAt" is null
+          inner join "album" as "linked_album" on "linked_album"."id" = "shared_space_album"."albumId"
+          and "linked_album"."deletedAt" is null
         where
           "album_space_asset"."assetId" = "asset"."id"
           and "shared_space_album"."spaceId" = any ($7::uuid[])
