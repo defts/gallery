@@ -21,10 +21,10 @@ const assets = async (ids: string[]) => {
   return Object.fromEntries(rows.map((row) => [row.id, row]));
 };
 
-const insertEdit = async (assetId: string, action: string, parameters: object) => {
+const insertEdit = async (assetId: string, action: string, parameters: object, sequence = 0) => {
   const { id } = await db
     .insertInto('asset_edit')
-    .values({ assetId, action: action as any, parameters: parameters as any, sequence: 0 })
+    .values({ assetId, action: action as any, parameters: parameters as any, sequence })
     .returning('id')
     .executeTakeFirstOrThrow();
   return id;
@@ -99,5 +99,24 @@ describe('1798900000000-MoveVideoTrimToSidecar', () => {
     expect(table).toEqual([{ name: null }]);
 
     await moveTrim.up(db);
+  });
+
+  it('keeps the lowest-sequence trim when an asset carries two', async () => {
+    const ctx = new SyncTestContext(db);
+    await moveTrim.down(db);
+
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id, type: AssetType.Video, duration: 30_000 });
+    const second = await insertEdit(asset.id, 'trim', { startTime: 2, endTime: 9, originalDuration: 30 }, 1);
+    const first = await insertEdit(asset.id, 'trim', { startTime: 5, endTime: 25, originalDuration: 30 }, 0);
+
+    await moveTrim.up(db);
+
+    const { rows: sidecar } = await sql<{ id: string; startTime: number }>`
+      SELECT id, "startTime" FROM asset_video_trim WHERE "assetId" = ${asset.id}
+    `.execute(db);
+    expect(sidecar).toEqual([{ id: first, startTime: 5 }]);
+    const { rows: edits } = await sql`SELECT id FROM asset_edit WHERE id IN (${first}, ${second})`.execute(db);
+    expect(edits).toEqual([]);
   });
 });

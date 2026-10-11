@@ -4,6 +4,9 @@ import { Kysely, sql } from 'kysely';
 // job had overwritten it with the trimmed file's). A trim stored without originalDuration (none are written today)
 // keeps its current asset.duration, the only length known for it. Deleting the asset_edit rows clears
 // asset."isEdited" through asset_edit_delete, so it is set again: the trimmed thumbnails are still the edited ones.
+// An asset with two trim rows (the old endpoint accepted that) keeps the lowest sequence, the one the old trim job
+// applied. A trimmed video whose metadata was re-extracted after the trim already showed its original length; the
+// migration cannot tell it from a pending job, so it keeps showing that length until the next trim job.
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`CREATE TABLE "asset_video_trim" (
   "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -27,7 +30,9 @@ export async function up(db: Kysely<any>): Promise<void> {
            END
       FROM "asset_edit" e
       JOIN "asset" a ON a."id" = e."assetId"
-     WHERE e."action" = 'trim';
+     WHERE e."action" = 'trim'
+     ORDER BY e."sequence"
+        ON CONFLICT ("assetId") DO NOTHING;
   `.execute(db);
   await sql`
     UPDATE "asset"
