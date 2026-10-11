@@ -440,11 +440,10 @@ export class NotificationService extends BaseService {
     }
 
     // An attachment path may be an S3 key, which the mailer cannot read: stage it locally until the mail is sent.
+    // Job data is a fresh copy per run, so rewriting the paths in place is local to this send.
     await using staged = new AsyncDisposableStack();
-    const imageAttachments: EmailImageAttachment[] = [];
     for (const attachment of data.imageAttachments ?? []) {
-      const { localPath } = staged.use(await this.backendMedia.ensureLocalFile(attachment.path));
-      imageAttachments.push({ ...attachment, path: localPath });
+      attachment.path = staged.use(await this.backendMedia.ensureLocalFile(attachment.path)).localPath;
     }
 
     const { to, subject, html, text: plain } = data;
@@ -456,7 +455,7 @@ export class NotificationService extends BaseService {
       from: notifications.smtp.from,
       replyTo: notifications.smtp.replyTo || notifications.smtp.from,
       smtp: notifications.smtp.transport,
-      imageAttachments: data.imageAttachments && imageAttachments,
+      imageAttachments: data.imageAttachments,
     });
 
     this.logger.log(`Sent mail with id: ${response.messageId} status: ${response.response}`);

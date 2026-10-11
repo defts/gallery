@@ -152,6 +152,16 @@ export function accessibleSpaceAlbums(eb: ExpressionBuilder<DB, keyof DB>, userI
     .where('shared_space_album.spaceId', 'in', (e) => accessibleSpaces(e, userId));
 }
 
+/** Album ids linked to one space, excluding soft-deleted albums. */
+export function spaceLinkedAlbumIds(eb: ExpressionBuilder<DB, keyof DB>, spaceId: string) {
+  return eb
+    .selectFrom('shared_space_album')
+    .innerJoin('album', 'album.id', 'shared_space_album.albumId')
+    .select('shared_space_album.albumId')
+    .where('shared_space_album.spaceId', '=', spaceId)
+    .where('album.deletedAt', 'is', null);
+}
+
 /**
  * The linked-album access path, as an `EXISTS (...)` predicate. Covers BOTH sources of a linked
  * album's contents: the album owner's own `album_asset` rows AND cross-owner `album_space_asset`

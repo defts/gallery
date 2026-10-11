@@ -42,11 +42,7 @@ export class StorageService extends BaseService {
     return StorageService.diskBackend;
   }
 
-  /**
-   * The one place that picks the backend for a stored path: a disk path (isDiskPath) is a disk file, a relative
-   * key lives on S3 when S3 is configured and under the media location otherwise. `absoluteDisk` lets a caller
-   * read disk paths through its own StorageRepository (see BackendMediaServer.backendFor).
-   */
+  // disk path: disk file (through `absoluteDisk`); relative key: S3, or the media location when S3 is off
   static backendFor(key: string, absoluteDisk: StorageBackend = StorageService.diskBackend): StorageBackend {
     if (isDiskPath(key)) {
       return absoluteDisk;
