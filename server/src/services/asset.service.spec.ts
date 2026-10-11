@@ -1221,6 +1221,7 @@ describe(AssetService.name, () => {
       });
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
       expect(mocks.websocket.clientSend).toHaveBeenCalledTimes(2);
+      expect(mocks.asset.getByIds).toHaveBeenLastCalledWith([asset1.id, asset2.id], auth.user.id);
     });
 
     it('should not update Assets table if no relevant fields are provided', async () => {

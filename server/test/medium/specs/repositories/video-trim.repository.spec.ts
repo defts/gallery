@@ -110,6 +110,22 @@ describe(VideoTrimRepository.name, () => {
     expect(stacked?.assets.find(({ id }) => id === video.id)).toMatchObject({ duration: 4000 });
   });
 
+  it('projects the trimmed duration and the caller favorite on the bulk-update read', async () => {
+    const { ctx, user, video, sut } = await setup();
+    const { user: member } = await ctx.newUser();
+    await sut.upsert(video.id, 1, 5);
+    await sut.setDuration(video.id, 4000);
+    await ctx.database.insertInto('asset_favorite').values({ assetId: video.id, userId: member.id }).execute();
+
+    const assets = ctx.get(AssetRepository);
+    await expect(assets.getByIds([video.id], member.id)).resolves.toEqual([
+      expect.objectContaining({ duration: 4000, isFavorite: false, isFavoriteForUser: true }),
+    ]);
+    await expect(assets.getByIds([video.id], user.id)).resolves.toEqual([
+      expect.objectContaining({ duration: 4000, isFavoriteForUser: false }),
+    ]);
+  });
+
   it('cascades with the asset', async () => {
     const { ctx, video, sut } = await setup();
     await sut.upsert(video.id, 1, 5);

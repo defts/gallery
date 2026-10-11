@@ -193,11 +193,50 @@ limit
 
 -- AssetRepository.getByIds
 select
-  "asset".*
+  "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration"
 from
   "asset"
 where
   "asset"."id" = any ($1::uuid[])
+
+-- AssetRepository.getByIds (with authUserId)
+select
+  "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
+  exists (
+    select
+      1 as "exists"
+    from
+      "asset_favorite"
+    where
+      "asset_favorite"."assetId" = "asset"."id"
+      and "asset_favorite"."userId" = $1::uuid
+  ) as "isFavoriteForUser"
+from
+  "asset"
+where
+  "asset"."id" = any ($2::uuid[])
 
 -- AssetRepository.getByIdsWithAllRelationsButStacks
 select

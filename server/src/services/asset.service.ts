@@ -324,7 +324,7 @@ export class AssetService extends BaseService {
     if (shouldWriteSidecar) {
       await this.jobRepository.queueAll(ids.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
     } else {
-      const assets = await this.assetRepository.getByIds(ids);
+      const assets = await this.assetRepository.getByIds(ids, auth.user.id);
       for (const asset of assets) {
         this.websocketRepository.clientSend('on_asset_update', auth.user.id, mapAsset(asset, { auth }));
       }

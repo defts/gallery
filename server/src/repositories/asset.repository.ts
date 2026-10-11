@@ -909,13 +909,21 @@ export class AssetRepository {
       .execute();
   }
 
-  // #763: no isFavoriteForUser projection here — the only caller (asset.service.ts updateAll, via
-  // priorAssets) reads `visibility` only, to snapshot the pre-write value for the #757 transition
-  // helper. The rows never reach mapAsset, so there is nothing to project.
-  @GenerateSql({ params: [[DummyValue.UUID]] })
+  // #763: updateAll maps these rows into on_asset_update, so they carry the trimmed duration and, given
+  // the caller's id, the caller's favorite (asset."isFavorite" is the owner's).
+  @GenerateSql(
+    { params: [[DummyValue.UUID]] },
+    { name: 'with authUserId', params: [[DummyValue.UUID], DummyValue.UUID] },
+  )
   @ChunkedArray()
-  getByIds(ids: string[]) {
-    return this.db.selectFrom('asset').selectAll('asset').where('asset.id', '=', anyUuid(ids)).execute();
+  getByIds(ids: string[], authUserId?: string) {
+    return this.db
+      .selectFrom('asset')
+      .selectAll('asset')
+      .select(projectedDuration)
+      .$if(!!authUserId, (qb) => qb.select((eb) => favoriteExistsFor(eb, authUserId!).as('isFavoriteForUser')))
+      .where('asset.id', '=', anyUuid(ids))
+      .execute();
   }
 
   @GenerateSql(
