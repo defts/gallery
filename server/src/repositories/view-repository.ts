@@ -8,7 +8,7 @@ import { favoriteExistsFor } from 'src/utils/favorite.js';
 import {
   type TimelineHiddenScope,
   hiddenFromOwnTimeline,
-  spaceAssetPathBranches,
+  ownedOrSharedWithViewer,
   timelineHiddenScopeIsEmpty,
 } from 'src/utils/shared-space-album-scope.js';
 
@@ -110,15 +110,10 @@ export class ViewRepository {
       ? eb.and([eb('asset.ownerId', '=', asUuid(userId)), subtraction])
       : eb('asset.ownerId', '=', asUuid(userId));
 
-    return eb.or([
-      ownerTerm,
-      ...spaceAssetPathBranches(eb, {
-        correlateAssetId: 'asset.id',
-        correlateLibraryId: 'asset.libraryId',
-        scope: visibleSpaceIds ? { spaceIds: visibleSpaceIds } : { memberUserId: userId },
-        albumTimelineGate: 'personal',
-        viewerId: userId,
-      }),
-    ]);
+    return ownedOrSharedWithViewer(eb, ownerTerm, {
+      scope: visibleSpaceIds ? { spaceIds: visibleSpaceIds } : { memberUserId: userId },
+      albumTimelineGate: 'personal',
+      viewerId: userId,
+    });
   }
 }

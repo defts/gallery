@@ -52,7 +52,7 @@ type ResolvedSmartSearch = {
   options: Omit<SmartSearchDto, 'page' | 'size' | 'order' | 'visibility'> & {
     embedding: string;
     // Optional: an `albumIds` scope deliberately leaves this unset so the album access check is the
-    // boundary and `albumSharedSpaceScope` re-gates — see resolveSmartSearch.
+    // boundary and `albumConfinedToViewer` re-gates — see resolveSmartSearch.
     userIds?: string[];
     callerId?: string;
     authUserId: string;
@@ -660,7 +660,7 @@ export class SearchService extends BaseService {
     /**
      * An `albumIds` scope makes the ALBUM the access boundary, exactly as `searchMetadata` already
      * treats it (see the matching branch there): check `AlbumRead` up front, then leave `userIds`
-     * unset so `albumSharedSpaceScope` re-gates the rows in the query builder.
+     * unset so `albumConfinedToViewer` re-gates the rows in the query builder.
      *
      * Keeping the owner-scoping `userIds` here instead was a filter-honesty bug. An album page
      * BROWSES by album access — timeline.service resolves `albumSpaceIds` from plain membership —
@@ -723,7 +723,7 @@ export class SearchService extends BaseService {
       ...dto,
       ...scope,
       // Undefined under an album scope — the AlbumRead check above is the boundary there, and
-      // `albumSharedSpaceScope` in the query builder is what re-gates visibility and trash.
+      // `albumConfinedToViewer` in the query builder is what re-gates visibility and trash.
       userIds: albumScoped ? undefined : await this.getUserIdsToSearch(auth, visibility),
       // Always set, unlike userIds: the facets' people list needs the viewer even when nothing is
       // owner-scoped. See SearchEmbeddingOptions.callerId.

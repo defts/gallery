@@ -70,6 +70,7 @@ import {
   type TimelineRescue,
   albumMembership,
   hiddenFromOwnTimeline,
+  ownedOrSharedWithViewer,
   spaceAssetPathBranches,
   spaceVisibilityGate,
   timelineHiddenScopeIsEmpty,
@@ -470,63 +471,33 @@ export function withTimeBucketAssetFilters<O>(
             qb.where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
           ),
       )
-      // #1041 §4: the `!timelineSpaceIds` branch — userIds set, shared spaces off. E12 requires the
-      // subtraction still applies here even with `withSharedSpaces: false`; easy to miss because this
-      // branch never touches a space table. There is no sibling visible-path arm here, so §3's
-      // rescue has to be built INTO the predicate (E12b/E12c) — that is what `visibleSpaceIds` is
-      // for, and it is resolved independently of `withSharedSpaces`.
-      .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
+      // #1041: the caller's own id carries the own-timeline subtraction, never a partner's (see
+      // ownerArmWithHiddenSubtraction). With timeline spaces, §3's rescue is the shared arm the
+      // viewer-scope predicate ORs in; without them (E12: the subtraction still applies with
+      // `withSharedSpaces: false`) there is no sibling arm, so the rescue is built inline from
+      // `visibleSpaceIds`. immich-30739's person-scoped shared-album widening (keyed on `personIds`,
+      // see `viewerId` above) is an independent admission path, so it ORs with the owner arm. The
+      // shared arm's album gate is the viewer's own per-user hide ('personal'), not the space flag.
+      .$if(!!options.userIds, (qb) =>
         qb.where((eb) => {
-          // #1041's owner arm, composed with immich-30739's person-scoped shared-album widening
-          // (fork: keyed on `personIds` — see the `viewerId` parameter above). The two are
-          // INDEPENDENT admission paths, so they OR: an asset reaching the viewer through a shared
-          // album is not withheld by the caller's own hidden-space scope, while the caller's own
-          // rows still carry the subtraction.
-          const ownerArm = ownerArmWithHiddenSubtraction(eb, options, {
-            kind: 'inline',
-            visibleSpaceIds: options.visibleSpaceIds ?? [],
-            viewerId: options.callerId ?? options.userIds![0],
-          });
-          return options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm;
+          const viewer = options.callerId ?? options.userIds![0];
+          const ownerArm = ownerArmWithHiddenSubtraction(
+            eb,
+            options,
+            options.timelineSpaceIds
+              ? { kind: 'sibling-arm' }
+              : { kind: 'inline', visibleSpaceIds: options.visibleSpaceIds ?? [], viewerId: viewer },
+          );
+          return ownedOrSharedWithViewer(
+            eb,
+            options.personIds?.length && viewerId ? eb.or([ownerArm, inSharedAlbum(eb, viewerId)]) : ownerArm,
+            options.timelineSpaceIds && {
+              scope: { spaceIds: options.timelineSpaceIds },
+              albumTimelineGate: 'personal',
+              viewerId: viewer,
+            },
+          );
         }),
-      )
-      .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            // Caller's own (and partner) rows follow the resolved top-level visibility; the
-            // caller's own id additionally carries the #1041 subtraction (never the partner's — see
-            // ownerArmWithHiddenSubtraction). §3's rescue is the sibling arm immediately below —
-            // it ORs the same `spaceAssetPathBranches` over the same visible spaces — so the
-            // subtraction here must NOT emit its own copy.
-            options.personIds?.length && viewerId
-              ? eb.or([
-                  ownerArmWithHiddenSubtraction(eb, options, { kind: 'sibling-arm' }),
-                  inSharedAlbum(eb, viewerId),
-                ])
-              : ownerArmWithHiddenSubtraction(eb, options, { kind: 'sibling-arm' }),
-            // Fork RBAC (Fix A): other members' rows are constrained to Archive+Timeline via the
-            // INDEPENDENT gate, so an explicit `visibility=HIDDEN`/`LOCKED` can't surface their
-            // Hidden/Locked in-space assets. Mirrors searchAssetBuilder's timelineSpaceIds arm.
-            //
-            // #1041 §3: this is the personal-timeline "V" (visible-path) term, so its album arm
-            // gates on the VIEWER's own per-user hide ('personal'), not the shared showInTimeline
-            // flag — for both another member's assets reaching the viewer via this space, and the
-            // viewer's own assets (which agree with the ownerArm subtraction above, since both read
-            // the same shared_space_album_hidden rows).
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb.or(
-                spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceIds: options.timelineSpaceIds! },
-                  albumTimelineGate: 'personal',
-                  viewerId: options.callerId ?? options.userIds![0],
-                }),
-              ),
-            ]),
-          ]),
-        ),
       )
       .$if(options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
@@ -1601,22 +1572,18 @@ export class AssetRepository {
       // timeline. The Timeline-only visibility gate below already covers the space arms' own
       // requirement (archived/hidden/locked space assets never reach the strip).
       //
-      // The branches are built from a detached `expressionBuilder<DB, 'asset'>()` rather than the
+      // The predicate is built on a detached `expressionBuilder<DB, 'asset'>()` rather than the
       // callback's own `eb`: the `cities` CTE widens this query's schema to `DB & { cities }`, which
       // no longer satisfies the shared helpers' `ExpressionBuilder<DB, keyof DB>` parameter. The
-      // emitted SQL is identical — the branches only ever reference `asset.*`.
+      // emitted SQL is identical — the predicate only ever references `asset.*`.
       .where((eb) =>
-        eb.or([
+        ownedOrSharedWithViewer(
+          expressionBuilder<DB, 'asset'>(),
           eb('asset.ownerId', '=', asUuid(ownerId)),
-          ...(timelineSpaceIds?.length
-            ? spaceAssetPathBranches(expressionBuilder<DB, 'asset'>(), {
-                correlateAssetId: 'asset.id',
-                correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: timelineSpaceIds },
-                albumTimelineGate: 'space-tab',
-              })
-            : []),
-        ]),
+          timelineSpaceIds?.length
+            ? { scope: { spaceIds: timelineSpaceIds }, albumTimelineGate: 'space-tab' }
+            : undefined,
+        ),
       )
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('type', '=', AssetType.Image)

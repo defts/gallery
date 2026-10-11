@@ -53,7 +53,13 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { hasAllPeople, hasAnyPeople } from 'src/utils/people-filter.js';
 import { fromChecksum } from 'src/utils/request.js';
-import { albumMembership, spaceAssetPathBranches, spaceVisibilityGate } from 'src/utils/shared-space-album-scope.js';
+import {
+  albumConfinedToViewer,
+  albumMembership,
+  ownedOrSharedWithViewer,
+  spaceAssetPathBranches,
+  spaceVisibilityGate,
+} from 'src/utils/shared-space-album-scope.js';
 import { dateTruncUnitForTimeBucketSize } from 'src/utils/timeline-bucket.js';
 
 export const getKyselyConfig = (connection: DatabaseConnectionParams): KyselyConfig => {
@@ -531,77 +537,6 @@ export function withEdits(eb: ExpressionBuilder<DB, 'asset'>): AliasedEditAction
   ).as('edits') as AliasedEditActions;
 }
 
-/**
- * Fork RBAC gate for album-scoped search. Upstream (immich #29352) grants
- * album-scoped searchMetadata access via album.read and leaves userIds unset,
- * which switches off the owner/space scoping in searchAssetBuilder. Re-gate so
- * shared-space content reached through an album is only visible to searchers who
- * can access it via space membership + timeline visibility (timelineSpaceIds).
- * Plain (non-shared-space) album assets stay visible per upstream album access.
- *
- * NOTE (L2 reverted): a Slice-6 change flattened this to a single
- * `spaceVisibilityGate` on the theory that the anti-join + `timelineSpaceIds`
- * re-admission was pure over-restriction vs the album grid. That was WRONG — the
- * `timelineSpaceIds`/showInTimeline gate is LOAD-BEARING: a space member who has
- * hidden a space from their timeline (showInTimeline=false) must not see that
- * space's directly-/library-linked content via album-scoped search or
- * suggestions. Flattening it re-admitted hidden-space content and broke the
- * People-identity RBAC projection tests (`people-identity-rbac.spec.ts`,
- * "album scope excludes ... while the space is hidden from timeline"). Restored
- * the anti-join + timelineSpaceIds arms; H1's `deletedAt IS NULL` (trashed
- * exclusion) is kept on every branch.
- */
-export function albumSharedSpaceScope<O>(qb: SelectQueryBuilder<DB, 'asset', O>, timelineSpaceIds?: string[]) {
-  return qb.where((eb) =>
-    eb.or([
-      eb.and([
-        // Fork RBAC (Slice 1 / security-1): the plain-album branch (assets NOT reached via a
-        // direct shared_space_asset / shared_space_library) had no visibility gate, so a Hidden or
-        // Locked asset reachable only through a linked album leaked to album searchers. Gate it flat
-        // (Archive+Timeline, no owner exception) to match the album grid's withDefaultVisibility.
-        spaceVisibilityGate(eb),
-        // Fork RBAC (Slice 1 / H1): album-granted search must never surface the owner's trashed
-        // assets, even when the caller flips withDeleted via trashedAfter/trashedBefore/isOffline.
-        eb('asset.deletedAt', 'is', null),
-        eb.not(eb.exists(eb.selectFrom('shared_space_asset').whereRef('shared_space_asset.assetId', '=', 'asset.id'))),
-        eb.not(
-          eb.exists(
-            eb.selectFrom('shared_space_library').whereRef('shared_space_library.libraryId', '=', 'asset.libraryId'),
-          ),
-        ),
-      ]),
-      ...(timelineSpaceIds
-        ? [
-            // Space-linked assets via direct asset membership: gate on Archive + Timeline
-            // (matches the album view's withDefaultVisibility; Hidden/Locked must not
-            // surface for viewers who are not the asset owner) + not-deleted (H1).
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb('asset.deletedAt', 'is', null),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_asset')
-                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                  .where('shared_space_asset.spaceId', '=', anyUuid(timelineSpaceIds)),
-              ),
-            ]),
-            // Space-linked assets via library membership: same Archive + Timeline + not-deleted gate.
-            eb.and([
-              spaceVisibilityGate(eb),
-              eb('asset.deletedAt', 'is', null),
-              eb.exists(
-                eb
-                  .selectFrom('shared_space_library')
-                  .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                  .where('shared_space_library.spaceId', '=', anyUuid(timelineSpaceIds)),
-              ),
-            ]),
-          ]
-        : []),
-    ]),
-  );
-}
-
 const joinDeduplicationPlugin = new DeduplicateJoinsPlugin();
 /** TODO: This should only be used for search-related queries, not as a general purpose query builder */
 // fork's live search path — carries the owner/space RBAC gate. All fork search call-sites use this,
@@ -661,7 +596,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
             eb.or([
               ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
               // Fork RBAC (H-1): the other-members branch must ALSO exclude trashed assets, mirroring
-              // albumSharedSpaceScope. Without this, a member (incl. a read-only Viewer) can pull another
+              // albumConfinedToViewer. Without this, a member (incl. a read-only Viewer) can pull another
               // member's trashed asset by flipping withDeleted — directly or implicitly via
               // trashedAfter/trashedBefore/isOffline (see :676) — because the terminal deletedAt filter
               // (:850) is caller-skippable. The ownerId branch stays unfiltered so a caller keeps
@@ -671,36 +606,11 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           ]),
         ),
       )
-      .$if(!!options.timelineSpaceIds && !!options.userIds, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            // Caller's own (and partner) rows follow the resolved visibility applied above.
-            eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-            // Other space members' rows are Archive+Timeline (Slice 10 aligns search with browse;
-            // elevation is per-owner, Hidden/Locked never surface for other members).
-            eb.and([
-              spaceVisibilityGate(eb),
-              // Fork RBAC (H-1): not-trashed on the other-members branch too (the ownerId branch above is
-              // left unfiltered). Mirrors the spaceId arm and albumSharedSpaceScope; never rely on the
-              // caller-skippable terminal deletedAt filter (:850).
-              eb('asset.deletedAt', 'is', null),
-              eb.or(
-                spaceAssetPathBranches(eb, {
-                  correlateAssetId: 'asset.id',
-                  correlateLibraryId: 'asset.libraryId',
-                  scope: { spaceIds: options.timelineSpaceIds! },
-                  albumTimelineGate: 'space-tab',
-                }),
-              ),
-            ]),
-          ]),
-        ),
-      )
       // albumAccessIsBoundary opts an album query OUT of this re-gate for a caller whose album ACCESS
       // check is already the boundary (see the option's doc comment in search.repository.ts, and the
       // call site in shared-space.service.ts getFilteredMapMarkers — issue #656).
       .$if(!!options.albumIds?.length && !options.userIds && !options.albumAccessIsBoundary, (qb) =>
-        albumSharedSpaceScope(qb, options.timelineSpaceIds),
+        qb.where((eb) => albumConfinedToViewer(eb, options.timelineSpaceIds)),
       )
       .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
         options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
@@ -762,8 +672,18 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       .$if(!!options.checksum, (qb) => qb.where('asset.checksum', '=', options.checksum!))
       .$if(!!options.id, (qb) => qb.where('asset.id', '=', asUuid(options.id!)))
       .$if(!!options.libraryId, (qb) => qb.where('asset.libraryId', '=', asUuid(options.libraryId!)))
-      .$if(!!options.userIds && !options.spaceId && !options.timelineSpaceIds, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
+      // A space-confined search (spaceId, no timeline spaces) scopes ownership in its own arm above.
+      .$if(!!options.userIds && (!options.spaceId || !!options.timelineSpaceIds), (qb) =>
+        qb.where((eb) =>
+          ownedOrSharedWithViewer(
+            eb,
+            eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+            options.timelineSpaceIds && {
+              scope: { spaceIds: options.timelineSpaceIds },
+              albumTimelineGate: 'space-tab',
+            },
+          ),
+        ),
       )
       .$if(!!options.encodedVideoPath, (qb) =>
         qb

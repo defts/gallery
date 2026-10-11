@@ -879,7 +879,7 @@ describe(SearchService.name, () => {
     // member's photos; query mode kept the owner-scoping `userIds`, so the same album searched
     // returned only the caller's own assets beside a grid that had just shown everyone's.
     // searchMetadata already resolves this the right way — access check instead of userIds, letting
-    // `albumSharedSpaceScope` re-gate — and searchSmart now matches it.
+    // `albumConfinedToViewer` re-gate — and searchSmart now matches it.
     describe('album access (albumIds)', () => {
       it('checks album read access when albumIds is provided', async () => {
         const albumId = newUuid();

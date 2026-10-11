@@ -34,7 +34,7 @@ import {
 import { favoriteExistsFor } from 'src/utils/favorite.js';
 import { without } from 'src/utils/filter-suggestions.js';
 import { type PaginationOptions, paginationHelper } from 'src/utils/pagination.js';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope.js';
+import { ownedOrSharedWithViewer } from 'src/utils/shared-space-album-scope.js';
 
 export interface SearchAssetIdOptions {
   checksum?: Buffer;
@@ -123,7 +123,7 @@ export interface SearchEmbeddingOptions {
   embedding: string;
   /**
    * Owner scoping. Optional — and left unset on purpose under an `albumIds` scope, where the
-   * caller's AlbumRead check is the access boundary and `albumSharedSpaceScope` re-gates the rows
+   * caller's AlbumRead check is the access boundary and `albumConfinedToViewer` re-gates the rows
    * (the same shape `searchMetadata` has always used). Matches `SearchUserIdOptions.userIds`.
    */
   userIds?: string[];
@@ -155,7 +155,7 @@ export interface SearchTagOptions {
 export interface SearchAlbumOptions {
   albumIds?: string[];
   /**
-   * Opts an `albumIds` query OUT of `albumSharedSpaceScope` (database.ts:608), for a caller whose
+   * Opts an `albumIds` query OUT of `albumConfinedToViewer`, for a caller whose
    * album ACCESS check (e.g. Permission.AlbumRead) is already the access boundary — matching the
    * album grid and the pre-fork `GET /albums/{id}/map-markers` endpoint (issue #656). Defaults to
    * false/absent, which preserves the existing shared-space re-gate for album-scoped
@@ -734,17 +734,13 @@ export class SearchRepository {
     // predicate only ever references `asset.*`, so the emitted SQL is unaffected.
     const viewerScope = () => {
       const eb = expressionBuilder<DB, 'asset'>();
-      return eb.or([
+      return ownedOrSharedWithViewer(
+        eb,
         eb('asset.ownerId', '=', anyUuid(userIds)),
-        ...(timelineSpaceIds?.length
-          ? spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceIds: timelineSpaceIds },
-              albumTimelineGate: 'space-tab',
-            })
-          : []),
-      ]);
+        timelineSpaceIds?.length
+          ? { scope: { spaceIds: timelineSpaceIds }, albumTimelineGate: 'space-tab' }
+          : undefined,
+      );
     };
 
     return (

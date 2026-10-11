@@ -436,6 +436,71 @@ export function spaceAssetPathBranches(
   ];
 }
 
+/** How a viewer's shared spaces enter a query: which spaces, and the album arm's gate. */
+export type ViewerSpaces = Pick<SpacePathBranchOptions, 'scope' | 'albumTimelineGate' | 'viewerId'>;
+
+/**
+ * Another member's asset that reaches the viewer through a path of `spaces`. It must be shareable
+ * (Archive or Timeline) and not trashed: visibility and trash are owner-private. Correlates on `asset`.
+ */
+export function sharedWithViewer(eb: ExpressionBuilder<DB, keyof DB>, spaces: ViewerSpaces): Expression<SqlBool> {
+  return eb.and([
+    spaceVisibilityGate(eb),
+    eb('asset.deletedAt', 'is', null),
+    eb.or(
+      spaceAssetPathBranches(eb, { correlateAssetId: 'asset.id', correlateLibraryId: 'asset.libraryId', ...spaces }),
+    ),
+  ]);
+}
+
+/**
+ * The viewer-scope predicate. `owned` is the caller's own-row term (the viewer, the partners it merges
+ * in, any own-timeline subtraction); with `spaces` it also admits what {@link sharedWithViewer} admits.
+ */
+export function ownedOrSharedWithViewer(
+  eb: ExpressionBuilder<DB, keyof DB>,
+  owned: Expression<SqlBool>,
+  spaces?: ViewerSpaces,
+): Expression<SqlBool> {
+  return spaces ? eb.or([owned, sharedWithViewer(eb, spaces)]) : owned;
+}
+
+/**
+ * The re-gate for an album-confined search, where album access stands in for ownership. An album row
+ * is returned only when it is shareable and not trashed (the album grid's own rule), and an asset that
+ * also sits in a space directly or through a library only through one of the viewer's
+ * `timelineSpaceIds`: a member who hid that space from their timeline must not get its content back
+ * through an album search.
+ */
+export function albumConfinedToViewer(
+  eb: ExpressionBuilder<DB, keyof DB>,
+  timelineSpaceIds?: string[],
+): Expression<SqlBool> {
+  return eb.and([
+    spaceVisibilityGate(eb),
+    eb('asset.deletedAt', 'is', null),
+    eb.or([
+      eb.and([
+        eb.not(eb.exists(eb.selectFrom('shared_space_asset').whereRef('shared_space_asset.assetId', '=', 'asset.id'))),
+        eb.not(
+          eb.exists(
+            eb.selectFrom('shared_space_library').whereRef('shared_space_library.libraryId', '=', 'asset.libraryId'),
+          ),
+        ),
+      ]),
+      ...(timelineSpaceIds
+        ? [
+            spaceDirectAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceIds: timelineSpaceIds } }),
+            spaceLibraryAssetExists(eb, {
+              correlateLibraryId: 'asset.libraryId',
+              scope: { spaceIds: timelineSpaceIds },
+            }),
+          ]
+        : []),
+    ]),
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Raw-SQL family — for the sites that author queries with `sql``` tagged
 // templates (face-identity.repository.ts, shared-space.repository.ts stats).
