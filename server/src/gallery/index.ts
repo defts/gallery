@@ -14,6 +14,7 @@ import { GalleryAssetController } from 'src/gallery/gallery-asset.controller.js'
 import { GalleryAssetService } from 'src/gallery/gallery-asset.service.js';
 import { GalleryPeopleController } from 'src/gallery/gallery-people.controller.js';
 import { GalleryPeopleService } from 'src/gallery/gallery-people.service.js';
+import { GalleryPluginService } from 'src/gallery/gallery-plugin.service.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/pet-face.repository.js';
 import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.repository.js';
@@ -93,6 +94,7 @@ export const galleryServices = [
   FaceSuggestionService,
   GalleryAssetService,
   GalleryPeopleService,
+  GalleryPluginService,
   LibraryManifestService,
   PetDetectionService,
   PetRecognitionService,
