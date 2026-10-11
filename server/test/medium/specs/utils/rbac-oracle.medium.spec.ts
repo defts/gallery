@@ -481,6 +481,40 @@ describe('viewer-scope RBAC oracle', () => {
     expect(result).toMatchSnapshot();
   });
 
+  // Upstream's structured search (V3): the variants mirror the legacy ones above by name, so adopting V3
+  // can be checked against the legacy id sets for the same actor and variant.
+  it('search V3: metadata, statistics and random', async () => {
+    const sut = world.ctx.getService(SearchService);
+    const { ownAlbum, spaceAlbum, tagSpace, pet } = world.ids;
+    const variants = {
+      default: () => ({ filter: {} }),
+      shared: () => ({ withSharedSpaces: true, filter: {} }),
+      favorites: () => ({ filter: { isFavorite: { eq: true } } }),
+      sharedFavorites: () => ({ withSharedSpaces: true, filter: { isFavorite: { eq: true } } }),
+      sharedNotFavorites: () => ({ withSharedSpaces: true, filter: { isFavorite: { eq: false } } }),
+      archive: () => ({ withSharedSpaces: true, filter: { visibility: { eq: AssetVisibility.Archive } } }),
+      hidden: () => ({ filter: { visibility: { eq: AssetVisibility.Hidden } } }),
+      locked: () => ({ filter: { visibility: { eq: AssetVisibility.Locked } } }),
+      ownAlbum: () => ({ filter: { albumIds: { any: [ownAlbum] } } }),
+      spaceAlbum: () => ({ filter: { albumIds: { any: [spaceAlbum] } } }),
+      tag: () => ({ withSharedSpaces: true, filter: { tagIds: { any: [tagSpace] } } }),
+      pet: () => ({ withSharedSpaces: true, filter: { personIds: { any: [pet] } } }),
+    };
+
+    const result = await matrix<Partial<MetadataSearchDto>>(variants, async (auth, dto) => ({
+      metadata: await attempt(
+        () => sut.searchMetadata(auth, { ...dto, size: 1000 }),
+        ({ assets }) => assetList(assets.items),
+      ),
+      statistics: await attempt(
+        () => sut.searchStatistics(auth, dto),
+        ({ total }) => total,
+      ),
+      random: await attempt(() => sut.searchRandom(auth, { ...dto, size: 1000 }), assetList),
+    }));
+    expect(result).toMatchSnapshot();
+  });
+
   it('search suggestions and filter facets', async () => {
     const sut = world.ctx.getService(SearchService);
     const { space, ownAlbum, spaceAlbum } = world.ids;

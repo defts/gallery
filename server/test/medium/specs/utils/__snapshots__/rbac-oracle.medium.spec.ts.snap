@@ -5530,6 +5530,817 @@ exports[`viewer-scope RBAC oracle > memories 1`] = `
 }
 `;
 
+exports[`viewer-scope RBAC oracle > search V3: metadata, statistics and random 1`] = `
+{
+  "albumEditor": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "albumLink": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "albumViewer": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "individualLink": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "owner": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "ownerElevated": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "partner": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "spaceAlbumLink": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "spaceEditor": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "spaceLink": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "spaceViewer": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "spaceViewerOff": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+  "stranger": {
+    "archive": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "default": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "favorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "hidden": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "locked": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "ownAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "pet": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "shared": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "sharedNotFavorites": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "spaceAlbum": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+    "tag": {
+      "metadata": "error:BadRequestException",
+      "random": "error:BadRequestException",
+      "statistics": "error:BadRequestException",
+    },
+  },
+}
+`;
+
 exports[`viewer-scope RBAC oracle > search suggestions and filter facets 1`] = `
 {
   "albumEditor": {
