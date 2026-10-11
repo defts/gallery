@@ -159,6 +159,19 @@ export class DuplicateRepository {
     return { duplicateId: result.duplicateId, assets: result.assets };
   }
 
+  // Unlike get, sees trashed, stacked, hidden, locked and exif-less assets: any of them can rejoin the group later.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async hasOtherOwner(duplicateId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .selectFrom('asset')
+      .select('id')
+      .where('duplicateId', '=', asUuid(duplicateId))
+      .where('ownerId', '!=', asUuid(userId))
+      .limit(1)
+      .executeTakeFirst();
+    return !!result;
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async delete(userId: string, id: string): Promise<void> {
     await this.db

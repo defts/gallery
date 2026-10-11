@@ -158,6 +158,17 @@ where
 group by
   "asset"."duplicateId"
 
+-- DuplicateRepository.hasOtherOwner
+select
+  "id"
+from
+  "asset"
+where
+  "duplicateId" = $1::uuid
+  and "ownerId" != $2::uuid
+limit
+  $3
+
 -- DuplicateRepository.delete
 update "asset"
 set

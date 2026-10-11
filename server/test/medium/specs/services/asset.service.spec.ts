@@ -584,6 +584,20 @@ describe(AssetService.name, () => {
       await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ duplicateId: null });
     });
 
+    it("should not join another owner's duplicate group whose only asset is trashed", async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const duplicateId = factory.uuid();
+      await ctx.newAsset({ ownerId: other.id, duplicateId, deletedAt: new Date() });
+      const { asset: mine } = await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.updateAll(factory.auth({ user }), { ids: [mine.id], duplicateId })).rejects.toThrow(
+        'Duplicate grouping can only join a group of assets you own',
+      );
+      await expect(ctx.get(AssetRepository).getById(mine.id)).resolves.toMatchObject({ duplicateId: null });
+    });
+
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queueAll.mockResolvedValue();
