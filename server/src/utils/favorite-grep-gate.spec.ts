@@ -42,14 +42,17 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
 };
 
 // Upstream's own column writes, kept as upstream text because the writer is provably the asset's owner. Duplicate
-// resolve's `assetUpdate.isFavorite` is the third (owner-scoped groups, AssetDelete on every trashed id); it reaches
-// updateAll by reference, which the scan does not follow.
+// resolve's `assetUpdate.isFavorite` is the third: resolve requires the caller to own every keeper and trashed copy
+// (AssetDelete), and PUT /assets refuses to join another owner's group. It is a property assignment, so the AST scan
+// misses it and UPSTREAM_OWNER_ASSIGNMENTS lists it.
 const UPSTREAM_OWNER_WRITES = [
   // upload: the uploader is the new asset's owner
   'src/services/asset-media.service.ts: isFavorite: dto.isFavorite',
   // copy: Permission.AssetCopy is owner-only on both assets, with no Gallery grant
   'src/services/asset.service.ts: isFavorite: sourceAsset.isFavorite',
 ];
+
+const UPSTREAM_OWNER_ASSIGNMENTS = ['src/services/duplicate.service.ts'];
 
 const collectTsFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -161,6 +164,8 @@ describe('asset.isFavorite gate (#763)', () => {
       rawAssetWrites(content).some((statement) => statement.includes('"isFavorite"')),
     );
     expect(rawWriters.map(({ path }) => path)).toEqual(['src/schema/functions.ts']);
+    const assigners = sources.filter(({ content }) => /\.isFavorite\s*=[^=]/.test(withoutComments(content)));
+    expect(assigners.map(({ path }) => path)).toEqual(UPSTREAM_OWNER_ASSIGNMENTS);
   });
 
   it('writes asset_favorite from trigger bodies only in the reverse projection trigger', () => {
