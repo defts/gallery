@@ -12,7 +12,14 @@ import { describe, expect, it } from 'vitest';
 const SERVER_ROOT = process.cwd();
 const SRC_DIR = join(SERVER_ROOT, 'src');
 
-const RAW_COLUMN_PATTERNS = [/'asset\.isFavorite'/g, /"asset\.isFavorite"/g, /asset\."isFavorite"/g];
+// Table-qualified references, plus a bare `isFavorite` used as a Kysely where key (only `asset` has that column
+// among the tables those builders select from).
+const RAW_COLUMN_PATTERNS = [
+  /'asset\.isFavorite'/g,
+  /"asset\.isFavorite"/g,
+  /asset\."isFavorite"/g,
+  /\bwhere(?:Ref)?\(\s*'isFavorite'/g,
+];
 
 // file -> how many raw references it may hold, and why each is owner-scoped.
 const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
@@ -20,6 +27,11 @@ const OWNER_SCOPED_READS: Record<string, { count: number; reason: string }> = {
     count: 3,
     reason:
       'columns.syncAsset (AssetSync streams only ownerId = the syncing user) and columns.workflowAssetV1 (listed twice, as upstream; workflow jobs act as the owner)',
+  },
+  'src/repositories/asset.repository.ts': {
+    count: 1,
+    reason:
+      'getStatistics, upstream text: filters ownerId = the caller, so the owner projection is the caller favorite',
   },
   'src/schema/functions.ts': { count: 2, reason: 'the forward projection trigger bodies' },
   'src/utils/database.ts': {
@@ -50,31 +62,53 @@ const withoutComments = (content: string) =>
     .join('\n');
 
 const ASSET_WRITE_METHODS = new Set(['create', 'createAll', 'update', 'updateAll', 'upsert']);
+const ASSET_REPOSITORY = /\bassetRepo(?:sitory)?$/i;
+const KYSELY_ASSET_WRITE = /(updateTable|insertInto)\(\s*'asset'\s*\)/;
 
-/** `isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE. */
+const keyName = (name: ts.PropertyName) => {
+  if (ts.isComputedPropertyName(name)) {
+    return ts.isStringLiteralLike(name.expression) ? name.expression.text : undefined;
+  }
+  return ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? name.text : undefined;
+};
+
+/**
+ * `isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE, and
+ * Kysely's `.set('isFavorite', value)`. A pre-built object passed by reference is not followed.
+ */
 const findColumnWrites = (path: string, content: string) => {
   const file = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
   const offenders: string[] = [];
-  const isAssetWrite = (node: ts.Node) => {
+  const report = (node: ts.Node) => {
+    const { line } = file.getLineAndCharacterOfPosition(node.getStart(file));
+    offenders.push(`${path}:${line + 1}: ${node.getText(file)}`);
+  };
+  const assetWriteMethod = (node: ts.Node) => {
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) {
-      return false;
+      return;
     }
     const method = node.expression.name.text;
     const receiver = node.expression.expression.getText(file);
-    if (ASSET_WRITE_METHODS.has(method) && receiver.endsWith('assetRepository')) {
-      return true;
+    if (ASSET_WRITE_METHODS.has(method) && ASSET_REPOSITORY.test(receiver)) {
+      return method;
     }
-    return (method === 'set' || method === 'values') && /(updateTable|insertInto)\(\s*'asset'\s*\)/.test(receiver);
+    return (method === 'set' || method === 'values') && KYSELY_ASSET_WRITE.test(receiver) ? method : undefined;
   };
   const visit = (node: ts.Node, inWrite: boolean) => {
-    const write = inWrite || isAssetWrite(node);
+    const method = assetWriteMethod(node);
+    if (method === 'set') {
+      const [column] = (node as ts.CallExpression).arguments;
+      if (column && ts.isStringLiteralLike(column) && column.text === 'isFavorite') {
+        report(node);
+      }
+    }
+    const write = inWrite || method !== undefined;
     if (
       write &&
       (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
-      node.name.getText(file) === 'isFavorite'
+      keyName(node.name) === 'isFavorite'
     ) {
-      const { line } = file.getLineAndCharacterOfPosition(node.getStart(file));
-      offenders.push(`${path}:${line + 1}: ${node.getText(file)}`);
+      report(node);
     }
     ts.forEachChild(node, (child) => visit(child, write));
   };
@@ -82,8 +116,20 @@ const findColumnWrites = (path: string, content: string) => {
   return offenders;
 };
 
+// Raw SQL statements that write the asset table (not asset_favorite or other asset_* tables).
+const rawAssetWrites = (content: string) =>
+  withoutComments(content)
+    .split(';')
+    .filter((statement) => /\b(?:update|insert\s+into)\s+"?asset(?:"|\s|\()/i.test(statement));
+
+// Raw SQL statements that write the overlay table itself.
+const rawOverlayWrites = (content: string) =>
+  withoutComments(content)
+    .split(';')
+    .filter((statement) => /\b(?:insert\s+into|delete\s+from|update)\s+"?asset_favorite(?:"|\s|\()/i.test(statement));
+
 describe('asset.isFavorite gate (#763)', () => {
-  it('reads the raw column only in the owner-scoped places listed here', () => {
+  it('reads the raw column (table-qualified, or as a bare where key) only in the owner-scoped places listed here', () => {
     const counts: Record<string, number> = {};
     for (const { path, content } of sources) {
       const text = withoutComments(content);
@@ -98,9 +144,20 @@ describe('asset.isFavorite gate (#763)', () => {
 
   it('never writes the column from application code', () => {
     expect(sources.flatMap(({ path, content }) => findColumnWrites(path, content))).toEqual([]);
-    // Raw SQL: only the forward projection triggers set the column.
-    const rawWriters = sources.filter(({ content }) => /SET\s+"isFavorite"/.test(withoutComments(content)));
+    // Raw SQL: only the forward projection triggers write the column.
+    const rawWriters = sources.filter(({ content }) =>
+      rawAssetWrites(content).some((statement) => statement.includes('"isFavorite"')),
+    );
     expect(rawWriters.map(({ path }) => path)).toEqual(['src/schema/functions.ts']);
+  });
+
+  it('writes asset_favorite from trigger bodies only in the reverse projection trigger', () => {
+    // The forward triggers fire at depth 0 only, so an overlay write from any other trigger would leave
+    // asset."isFavorite" stale.
+    const functions = sources.find(({ path }) => path === 'src/schema/functions.ts')!.content;
+    const reverseBody = /name: 'asset_is_favorite_after_write'[\s\S]*?END`/.exec(functions)![0];
+    expect(rawOverlayWrites(functions.replace(reverseBody, ''))).toEqual([]);
+    expect(rawOverlayWrites(reverseBody)).toHaveLength(2);
   });
 
   it('maps responses from the caller-resolved favorite, never the owner projection', () => {
@@ -114,9 +171,15 @@ describe('asset.isFavorite gate (#763)', () => {
       `await this.assetRepository.update({ id, isFavorite });`,
       `await db.updateTable('asset').set({ isFavorite: false }).execute();`,
       `await db.insertInto('asset').values({ ...asset, isFavorite: true }).execute();`,
+      `await db.updateTable('asset').set('isFavorite', true).execute();`,
+      `await this.assetRepo.update({ id, ['isFavorite']: true });`,
       `await this.assetRepository.updateAll(ids, { visibility });`,
       `await this.personRepository.update({ id, isFavorite: true });`,
+      // Known miss: a pre-built object passed by reference.
+      `const patch = { isFavorite: true }; await this.assetRepository.updateAll(ids, patch);`,
     ].join('\n');
-    expect(findColumnWrites('sample.ts', sample)).toHaveLength(4);
+    expect(findColumnWrites('sample.ts', sample)).toHaveLength(6);
+    expect(rawAssetWrites(`UPDATE asset SET name = $1, "isFavorite" = $2`)).toHaveLength(1);
+    expect(rawAssetWrites(`update "asset_favorite" set "userId" = $1`)).toEqual([]);
   });
 });
