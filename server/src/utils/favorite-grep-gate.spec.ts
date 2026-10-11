@@ -73,8 +73,9 @@ const keyName = (name: ts.PropertyName) => {
 };
 
 /**
- * `isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE, and
- * Kysely's `.set('isFavorite', value)`. A pre-built object passed by reference is not followed.
+ * `isFavorite` keys inside an asset write: an AssetRepository write or a Kysely asset INSERT/UPDATE (including an
+ * INSERT's `onConflict` update), and Kysely's `.set('isFavorite', value)`. A pre-built object passed by reference
+ * is not followed.
  */
 const findColumnWrites = (path: string, content: string) => {
   const file = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
@@ -92,7 +93,7 @@ const findColumnWrites = (path: string, content: string) => {
     if (ASSET_WRITE_METHODS.has(method) && ASSET_REPOSITORY.test(receiver)) {
       return method;
     }
-    return (method === 'set' || method === 'values') && KYSELY_ASSET_WRITE.test(receiver) ? method : undefined;
+    return ['set', 'values', 'onConflict'].includes(method) && KYSELY_ASSET_WRITE.test(receiver) ? method : undefined;
   };
   const visit = (node: ts.Node, inWrite: boolean) => {
     const method = assetWriteMethod(node);
@@ -173,12 +174,13 @@ describe('asset.isFavorite gate (#763)', () => {
       `await db.insertInto('asset').values({ ...asset, isFavorite: true }).execute();`,
       `await db.updateTable('asset').set('isFavorite', true).execute();`,
       `await this.assetRepo.update({ id, ['isFavorite']: true });`,
+      `await db.insertInto('asset').values(row).onConflict((oc) => oc.column('id').doUpdateSet({ isFavorite: true }));`,
       `await this.assetRepository.updateAll(ids, { visibility });`,
       `await this.personRepository.update({ id, isFavorite: true });`,
       // Known miss: a pre-built object passed by reference.
       `const patch = { isFavorite: true }; await this.assetRepository.updateAll(ids, patch);`,
     ].join('\n');
-    expect(findColumnWrites('sample.ts', sample)).toHaveLength(6);
+    expect(findColumnWrites('sample.ts', sample)).toHaveLength(7);
     expect(rawAssetWrites(`UPDATE asset SET name = $1, "isFavorite" = $2`)).toHaveLength(1);
     expect(rawAssetWrites(`update "asset_favorite" set "userId" = $1`)).toEqual([]);
   });
