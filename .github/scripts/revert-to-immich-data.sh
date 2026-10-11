@@ -99,12 +99,16 @@ seed() {
   partner_archived=$(upload "$partner" "$media/128x96.jpg")
   api PUT /assets "$partner" "{\"ids\":[\"$partner_archived\"],\"visibility\":\"archive\"}" >/dev/null
 
-  # Trim needs the extracted duration; the trim job rewrites asset.duration when it finishes.
+  # Trim needs the extracted duration. The trim job records the trimmed length in asset_video_trim;
+  # asset.duration keeps the original's, which is what a stock server plays.
   local original_duration
   original_duration=$(poll 180 "SELECT coalesce(duration, 0) FROM asset WHERE id = '$video'" '^[1-9][0-9]*$')
-  api PUT "/assets/$video/edits" "$owner" \
-    '{"edits":[{"action":"trim","parameters":{"startTime":1,"endTime":3}}]}' >/dev/null
-  poll 180 "SELECT duration FROM asset WHERE id = '$video' AND duration <> $original_duration" '^[0-9]+$' >/dev/null
+  api PUT "/assets/$video/trim" "$owner" '{"startTime":1,"endTime":3}' >/dev/null
+  poll 180 "SELECT duration FROM asset_video_trim WHERE \"assetId\" = '$video' AND duration IS NOT NULL" '^[0-9]+$' >/dev/null
+  [ "$(psql_q "SELECT duration FROM asset WHERE id = '$video'")" = "$original_duration" ] ||
+    fail "seed: the trim changed asset.duration"
+  [ "$(api GET "/assets/$video" "$owner" | jq -r .duration)" != "$original_duration" ] ||
+    fail "seed: Gallery does not report the trimmed duration"
 
   # A space with the member as editor, holding both owners' photos.
   local space
@@ -242,7 +246,6 @@ stock_sync_checks() {
     failed=1
   }
   check "$phase" 'sync stream completes' "$(jq -r .type <<<"$body" | tail -n1)" SyncCompleteV1
-  check "$phase" 'sync sends no trim edit' "$(jq -c 'select(.type == "AssetEditV1" and .data.action == "trim")' <<<"$body")" ''
   check "$phase" 'sync sends no rule memory' "$(jq -c 'select((.type | startswith("MemoryV")) and .data.type == "rule")' <<<"$body")" ''
   check "$phase" 'sync sends no pet' "$(jq -c 'select(.type == "PersonV1" and .data.name == "Revert Pet")' <<<"$body")" ''
 }
@@ -271,7 +274,7 @@ assert() {
   check assert 'memories API returns no rule' "$(api GET /memories "$owner" | jq '[.[] | select(.type == "rule")] | length')" 0
 
   check assert 'trim duration restored' "$(psql_q "SELECT duration FROM asset WHERE id = '$VIDEO'")" "$ORIGINAL_DURATION"
-  check assert 'trim edit removed' "$(psql_q "SELECT count(*) FROM asset_edit WHERE \"assetId\" = '$VIDEO'")" 0
+  check assert 'trimmed video no longer edited' "$(psql_q "SELECT \"isEdited\" FROM asset WHERE id = '$VIDEO'")" f
   check assert 'trimmed files unreferenced' "$(psql_q "SELECT count(*) FROM asset_file WHERE \"assetId\" = '$VIDEO' AND \"isEdited\"")" 0
   check assert 'trimmed thumbhash cleared' "$(psql_q "SELECT thumbhash IS NULL FROM asset WHERE id = '$VIDEO'")" t
 

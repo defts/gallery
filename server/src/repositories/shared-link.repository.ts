@@ -14,6 +14,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { Album, columns } from 'src/database.js';
 import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserRole, SharedLinkType } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
@@ -40,6 +41,7 @@ const withSharedAssets = (eb: ExpressionBuilder<DB, 'shared_link'>) => {
       // withdrawn contribution drops out of both at the same moment.
       .where((eb) => sharedLinkAssetIsServable(asBaseEb(eb)))
       .selectAll('asset')
+      .select(projectedDuration)
       .orderBy('asset.fileCreatedAt', 'asc')
   );
 };
@@ -111,6 +113,7 @@ export class SharedLinkRepository {
                 eb
                   .selectFrom('asset')
                   .selectAll('asset')
+                  .select(projectedDuration)
                   .whereRef('album_asset.assetId', '=', 'asset.id')
                   .where('asset.deletedAt', 'is', null)
                   .innerJoinLateral(withExifInfo, (join) => join.onTrue())
@@ -273,6 +276,7 @@ export class SharedLinkRepository {
             .selectFrom('asset')
             .whereRef('asset.id', '=', 'shared_link_asset.assetId')
             .selectAll('asset')
+            .select(projectedDuration)
             .innerJoinLateral(withExifInfo, (join) => join.onTrue())
             .as('assets'),
         (join) => join.onTrue(),

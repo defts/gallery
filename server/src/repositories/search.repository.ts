@@ -17,6 +17,7 @@ import { DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchFilter, SearchOrder } from 'src/dtos/search.dto.js';
 import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -485,6 +486,7 @@ export class SearchRepository {
       ratingIsMinimum: true,
     })
       .selectAll('asset')
+      .select(projectedDuration)
       // #763: project the per-user overlay onto the rows feeding mapAsset via searchSmart's
       // mapResponse. Flows through both the 'cte' (candidates.selectAll()) and 'simple' outer
       // query paths below since both select every column baseQuery projects.

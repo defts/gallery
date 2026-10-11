@@ -19,7 +19,7 @@ import { ImagePathOptions, StorageCore, ThumbnailPathEntity } from 'src/cores/st
 import { AssetFile } from 'src/database.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
 import { ConfigFFmpegDto, SystemConfig } from 'src/dtos/config.dto.js';
-import { AssetEditAction, CropParameters, TrimParameters } from 'src/dtos/editing.dto.js';
+import { AssetEditAction, CropParameters } from 'src/dtos/editing.dto.js';
 import {
   AssetFileType,
   AssetType,
@@ -221,10 +221,10 @@ export class MediaService extends BaseService {
     await using original = await this.backendMedia.ensureLocalFile(asset.originalPath);
     const { localPath } = original;
 
-    const trimEdit = asset.edits.find((e) => e.action === AssetEditAction.Trim);
+    const trim = asset.type === AssetType.Video ? await this.videoTrimRepository.get(asset.id) : undefined;
 
-    if (asset.type === AssetType.Video && trimEdit) {
-      return await this.videoTrimLock.acquire(asset.id, () => this.handleVideoTrim(asset, config, trimEdit, localPath));
+    if (trim) {
+      return await this.videoTrimLock.acquire(asset.id, () => this.handleVideoTrim(asset, config, trim, localPath));
     }
 
     if (asset.type === AssetType.Video && asset.edits.length === 0) {
@@ -283,10 +283,9 @@ export class MediaService extends BaseService {
   private async handleVideoTrim(
     asset: ThumbnailAsset,
     config: SystemConfig,
-    trimEdit: ThumbnailAsset['edits'][number],
+    params: { startTime: number; endTime: number },
     localPath: string,
   ): Promise<JobStatus> {
-    const params = trimEdit.parameters as TrimParameters & { originalDuration: number };
     const duration = params.endTime - params.startTime;
 
     // ffmpeg always reads the original. The asset's encoded video is not a candidate:
@@ -321,7 +320,7 @@ export class MediaService extends BaseService {
     const framePath = `${outputPath}.frame-${randomUUID()}.jpg`;
     try {
       // Re-probe for the actual trimmed duration. It is committed to the DB only after the
-      // trimmed video is durably persisted (below), so a mid-op failure can't leave the asset's
+      // trimmed video is durably persisted (below), so a mid-op failure can't leave the trim's
       // duration pointing at a video that was never stored.
       const probeResult = await this.mediaRepository.probe(outputPath);
       const probedDuration = probeResult.format.duration;
@@ -378,7 +377,7 @@ export class MediaService extends BaseService {
       );
 
       // Commit the new duration only now that the trimmed video + files are persisted.
-      await this.assetRepository.update({ id: asset.id, duration: newDuration });
+      await this.videoTrimRepository.setDuration(asset.id, newDuration);
 
       if (
         thumbnailResult.thumbhash &&

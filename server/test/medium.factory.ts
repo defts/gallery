@@ -31,6 +31,7 @@ import { QueueMaintenanceRepository } from 'src/gallery/queue-maintenance.reposi
 import { SmartFacetRepository } from 'src/gallery/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/space-album.repository.js';
 import { GallerySyncRepository } from 'src/gallery/sync/gallery-sync.repository.js';
+import { VideoTrimRepository } from 'src/gallery/video-trim.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -688,6 +689,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case StackRepository:
     case SyncRepository:
     case GallerySyncRepository:
+    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:
@@ -778,6 +780,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case SessionRepository:
     case SyncRepository:
     case GallerySyncRepository:
+    case VideoTrimRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:
     case UserRepository:

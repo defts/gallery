@@ -1005,8 +1005,7 @@ describe(AssetMediaService.name, () => {
         isEdited: true,
         path: '/encoded-video/owner/asset_edited.mp4',
       });
-      const editedAsset = AssetFactory.from({ type: AssetType.Video })
-        .edit({ action: AssetEditAction.Trim })
+      const editedAsset = AssetFactory.from({ type: AssetType.Video, isEdited: true })
         .file({ type: AssetFileType.EncodedVideo })
         .file({ type: AssetFileType.FullSize, isEdited: true })
         .file(trimmedVideoFile)

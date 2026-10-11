@@ -95,6 +95,17 @@ order by
 -- ViewRepository.getAssetsByOriginalPath
 select
   "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   to_json("asset_exif") as "exifInfo",
   exists (
     select

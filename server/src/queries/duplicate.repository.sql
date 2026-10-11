@@ -15,6 +15,17 @@ with
       inner join lateral (
         select
           "asset".*,
+          coalesce(
+            (
+              select
+                "asset_video_trim"."duration"
+              from
+                "asset_video_trim"
+              where
+                "asset_video_trim"."assetId" = "asset"."id"
+            ),
+            "asset"."duration"
+          ) as "duration",
           exists (
             select
               1 as "exists"
@@ -103,6 +114,17 @@ from
   inner join lateral (
     select
       "asset".*,
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       to_json("asset_exif") as "exifInfo",
       (
         select

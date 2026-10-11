@@ -123,6 +123,7 @@ describe('revert-to-immich.sql', () => {
       'DELETE FROM "person_group"',
       `DELETE FROM "memory" WHERE "type" = 'rule'`,
       'SET "thumbhash" = NULL',
+      'FROM "asset_video_trim"',
       `'originalDuration'`,
       `DELETE FROM "asset_edit" WHERE "action" = 'trim'`,
       'DELETE FROM "shared_link_asset"',

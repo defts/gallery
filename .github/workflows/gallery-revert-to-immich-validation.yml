@@ -31,6 +31,9 @@ on:
       - 'server/src/services/sync.service.ts'
       - 'server/src/repositories/sync.repository.ts'
       - 'server/src/dtos/sync.dto.ts'
+      # The seed phase trims a video through the PR's server.
+      - 'server/src/gallery/video-trim*'
+      - 'server/src/services/media.service.ts'
       - '.github/workflows/gallery-revert-to-immich-validation.yml'
       - '.github/scripts/revert-to-immich-data.sh'
 

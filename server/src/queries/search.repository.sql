@@ -19,7 +19,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -82,7 +92,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -215,7 +235,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -275,7 +305,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -337,6 +377,17 @@ from
   (
     select
       "asset".*,
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       exists (
         select
           1 as "exists"
@@ -703,7 +754,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -896,7 +957,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1007,7 +1078,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1054,7 +1135,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1120,7 +1211,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1167,7 +1268,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1214,7 +1325,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1261,7 +1382,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1308,7 +1439,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1355,7 +1496,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1409,7 +1560,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1469,7 +1630,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1530,7 +1701,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1590,7 +1771,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1645,7 +1836,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1705,7 +1906,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1758,7 +1969,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1812,7 +2033,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1862,7 +2093,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1909,7 +2150,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -1959,7 +2210,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2007,7 +2268,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2054,7 +2325,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2113,7 +2394,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2183,7 +2474,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2230,7 +2531,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2274,7 +2585,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2321,7 +2642,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2373,7 +2704,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",
@@ -2428,7 +2769,17 @@ select
   "asset"."checksum",
   "asset"."checksumAlgorithm",
   "asset"."duplicateId",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."fileCreatedAt",
   "asset"."fileModifiedAt",
   "asset"."isExternal",

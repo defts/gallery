@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -927,6 +928,7 @@ export class AssetRepository {
       this.db
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .select(withFacesAndPeople({ viewingUserId }))
         .select(withTags)
         .$call(withExif)
@@ -1041,6 +1043,7 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .selectAll('asset')
+      .select(projectedDuration)
       .where('asset.id', '=', asUuid(id))
       .$if(!!exifInfo, withExif)
       .$if(!!faces, (qb) =>
@@ -1113,6 +1116,7 @@ export class AssetRepository {
         .with('asset', (qb) => qb.updateTable('asset').set(asset).where('id', '=', asUuid(asset.id)).returningAll())
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .$call(withExif)
         .$call((qb) => qb.select(withFaces))
         .$call((qb) => qb.select(withEdits))
@@ -1436,7 +1440,7 @@ export class AssetRepository {
           .innerJoin('asset', 'asset.id', 'filtered.id')
           .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
           .select((eb) => [
-            'asset.duration',
+            projectedDuration(eb),
             'asset.id',
             'asset.visibility',
             // The `eb` here is scoped to this `.with('cte', ...)` builder (DB & { filtered: ... }),
@@ -1852,13 +1856,7 @@ export class AssetRepository {
   async getForEdit(id: string) {
     return this.db
       .selectFrom('asset')
-      .select([
-        'asset.type',
-        'asset.livePhotoVideoId',
-        'asset.originalPath',
-        'asset.originalFileName',
-        'asset.duration',
-      ])
+      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName'])
       .where('asset.id', '=', id)
       .innerJoin('asset_exif', (join) => join.onRef('asset_exif.assetId', '=', 'asset.id'))
       .select([

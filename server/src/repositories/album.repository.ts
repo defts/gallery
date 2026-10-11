@@ -15,6 +15,7 @@ import { columns } from 'src/database.js';
 import { Chunked, ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserCreateDto, MapAlbumDto } from 'src/dtos/album.dto.js';
 import { AlbumUserRole } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { DB } from 'src/schema/index.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -59,6 +60,7 @@ const withAssets = (eb: ExpressionBuilder<DB, 'album'>) => {
       eb
         .selectFrom('asset')
         .selectAll('asset')
+        .select(projectedDuration)
         .leftJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
         .select((eb) =>
           eb.table('asset_exif').$castTo<ShallowDehydrateObject<Selectable<AssetExifTable>>>().as('exifInfo'),

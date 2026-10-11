@@ -15,6 +15,7 @@ import {
   UserAvatarColor,
   UserStatus,
 } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { AlbumTable } from 'src/schema/tables/album.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
@@ -444,7 +445,7 @@ export const columns = {
     'asset.checksum',
     'asset.checksumAlgorithm',
     'asset.duplicateId',
-    'asset.duration',
+    projectedDuration,
     'asset.fileCreatedAt',
     'asset.fileModifiedAt',
     'asset.isExternal',
@@ -553,7 +554,7 @@ export const columns = {
     'asset.deletedAt',
     'asset.isFavorite',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -574,7 +575,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -595,7 +596,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -616,7 +617,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',
@@ -641,7 +642,7 @@ export const columns = {
     'asset.type',
     'asset.deletedAt',
     'asset.visibility',
-    'asset.duration',
+    projectedDuration,
     'asset.livePhotoVideoId',
     'asset.stackId',
     'asset.libraryId',

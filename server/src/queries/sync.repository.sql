@@ -70,7 +70,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -112,7 +122,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -156,7 +176,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -440,7 +470,17 @@ select
   "asset"."deletedAt",
   "asset"."isFavorite",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -910,7 +950,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",
@@ -971,7 +1021,17 @@ select
   "asset"."type",
   "asset"."deletedAt",
   "asset"."visibility",
-  "asset"."duration",
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   "asset"."livePhotoVideoId",
   "asset"."stackId",
   "asset"."libraryId",

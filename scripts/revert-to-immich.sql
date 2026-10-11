@@ -20,7 +20,7 @@
 --     system_metadata's system-config row — that key is stripped too)
 --   * Pet detection results: every pet, its faces and its embeddings
 --   * Rule memories (Immich only knows on-this-day and birthday memories)
---   * Video trims: the original duration comes back and the trimmed copy is
+--   * Video trims: the full-length video comes back and the trimmed copy is
 --     no longer referenced
 --   * Other members' photos in links shared from a space, album links to
 --     albums the creator neither owns nor edits, and asset links left empty
@@ -148,14 +148,33 @@ END $$;
 -- rows cascade.
 DELETE FROM "memory" WHERE "type" = 'rule';
 
--- Video trims. Immich only edits images: it would show the trimmed duration and
--- the trimmed thumbnails over the full-length original. Restore the original
--- duration (stored in seconds in the edit), then drop the edited files the trim
--- produced and the edit itself. A trim cannot be combined with an image edit,
--- so every edited file of a trimmed asset came from the trim. The trimmed video
--- and thumbnails stay on disk as unreferenced files. The trim also replaced the
+-- Video trims. Immich only edits images: it would show the trimmed thumbnails
+-- over the full-length original. Drop the edited files the trim produced and
+-- the trim itself. A trim cannot be combined with an image edit, so every
+-- edited file of a trimmed asset came from the trim. The trimmed video and
+-- thumbnails stay on disk as unreferenced files. The trim also replaced the
 -- thumbhash with the trimmed frame's; clearing it makes Immich's nightly
 -- missing-thumbnails job regenerate it from the original.
+--
+-- Current Gallery keeps trims in asset_video_trim, and asset.duration is
+-- already the original's. Clear isEdited too, so Immich asks for the original
+-- thumbnails.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_video_trim') IS NOT NULL THEN
+    UPDATE "asset"
+       SET "thumbhash" = NULL, "isEdited" = false
+      FROM "asset_video_trim"
+     WHERE "asset_video_trim"."assetId" = "asset"."id";
+    DELETE FROM "asset_file"
+     WHERE "isEdited"
+       AND "assetId" IN (SELECT "assetId" FROM "asset_video_trim");
+  END IF;
+END
+$$;
+-- Gallery before 1798900000000 kept trims in asset_edit and the trimmed length
+-- in asset.duration: restore the original duration (stored in seconds in the
+-- edit). Deleting the edit clears isEdited through asset_edit_delete.
 UPDATE "asset"
    SET "thumbhash" = NULL
   FROM "asset_edit"
@@ -383,6 +402,9 @@ DROP TABLE IF EXISTS "asset_favorite" CASCADE;
 
 -- Gallery job stamps (pet detection, classification) beside asset_job_status.
 DROP TABLE IF EXISTS "asset_job_status_gallery" CASCADE;
+
+-- Video trims, cleaned up in step 1 above.
+DROP TABLE IF EXISTS "asset_video_trim" CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- 3. Drop Gallery-only functions.
@@ -776,6 +798,7 @@ DELETE FROM "kysely_migrations"
   '1798600000000-AddPersonIdentityTable',
   '1798700000000-AddPersonPetTable',
   '1798800000000-RestoreAssetIsFavoriteProjection',
+  '1798900000000-MoveVideoTrimToSidecar',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -886,6 +909,7 @@ BEGIN
        'pet_search',
        'asset_favorite_audit', 'asset_favorite',
        'asset_job_status_gallery',
+       'asset_video_trim',
        'person_identity',
        'person_pet',
        'gallery_migrations', 'gallery_migrations_lock'

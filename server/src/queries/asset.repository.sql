@@ -202,6 +202,17 @@ where
 -- AssetRepository.getByIdsWithAllRelationsButStacks
 select
   "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   (
     select
       coalesce(json_agg(agg), '[]')
@@ -290,6 +301,17 @@ where
 -- AssetRepository.getByIdsWithAllRelationsButStacks (with authUserId)
 select
   "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   (
     select
       coalesce(json_agg(agg), '[]')
@@ -518,7 +540,18 @@ limit
 
 -- AssetRepository.getById
 select
-  "asset".*
+  "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration"
 from
   "asset"
 where
@@ -529,6 +562,17 @@ limit
 -- AssetRepository.getById (with authUserId)
 select
   "asset".*,
+  coalesce(
+    (
+      select
+        "asset_video_trim"."duration"
+      from
+        "asset_video_trim"
+      where
+        "asset_video_trim"."assetId" = "asset"."id"
+    ),
+    "asset"."duration"
+  ) as "duration",
   exists (
     select
       1 as "exists"
@@ -744,7 +788,17 @@ with
   ),
   "cte" as (
     select
-      "asset"."duration",
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       "asset"."id",
       "asset"."visibility",
       exists (
@@ -849,7 +903,17 @@ with
   ),
   "cte" as (
     select
-      "asset"."duration",
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       "asset"."id",
       "asset"."visibility",
       exists (
@@ -940,7 +1004,17 @@ with
   ),
   "cte" as (
     select
-      "asset"."duration",
+      coalesce(
+        (
+          select
+            "asset_video_trim"."duration"
+          from
+            "asset_video_trim"
+          where
+            "asset_video_trim"."assetId" = "asset"."id"
+        ),
+        "asset"."duration"
+      ) as "duration",
       "asset"."id",
       "asset"."visibility",
       exists (
@@ -1267,7 +1341,6 @@ select
   "asset"."livePhotoVideoId",
   "asset"."originalPath",
   "asset"."originalFileName",
-  "asset"."duration",
   "asset_exif"."exifImageWidth",
   "asset_exif"."exifImageHeight",
   "asset_exif"."orientation",

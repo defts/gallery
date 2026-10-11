@@ -6,6 +6,7 @@ import { columns } from 'src/database.js';
 import { Chunked, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetStatus, AssetType, VectorIndex } from 'src/enum.js';
+import { projectedDuration } from 'src/gallery/projected-duration.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -50,6 +51,7 @@ export class DuplicateRepository {
                 qb
                   .selectFrom('asset_exif')
                   .selectAll('asset')
+                  .select(projectedDuration)
                   .select((eb) => favoriteExistsFor(eb, userId).as('isFavoriteForUser'))
                   .select((eb) =>
                     eb.fn
@@ -127,6 +129,7 @@ export class DuplicateRepository {
           qb
             .selectFrom('asset_exif')
             .selectAll('asset')
+            .select(projectedDuration)
             .select((eb) => eb.fn.toJson('asset_exif').as('exifInfo'))
             .select((eb) =>
               jsonArrayFrom(
