@@ -254,7 +254,8 @@ class SyncApiRepository {
       try {
         event = converter(dataJson);
       } catch (error) {
-        _logger.warning("Skipping undecodable $type line: $error");
+        final id = dataJson is Map ? dataJson['id'] : null;
+        _logger.warning("Skipping undecodable $type line (id: $id): $error");
         continue;
       }
       data.add(SyncEvent(type: type, data: event, ack: ack));
