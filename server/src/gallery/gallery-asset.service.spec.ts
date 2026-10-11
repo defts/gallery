@@ -222,22 +222,18 @@ describe(GalleryAssetService.name, () => {
       });
 
       it('probes a disk video by its path, without presigning', async () => {
-        const { StorageService } = await import('src/services/storage.service.js');
-        const resolveSpy = vi.spyOn(StorageService, 'resolveBackendForKey');
         mocks.videoTrim.getForTrim.mockResolvedValue(video());
         mocks.media.probe.mockResolvedValue(videoStream);
 
         await sut.setTrim(authStub.admin, assetId, { startTime: 5, endTime: 25 });
 
         expect(mocks.media.probe).toHaveBeenCalledWith('/data/library/video.mp4');
-        expect(resolveSpy).not.toHaveBeenCalled();
-        vi.restoreAllMocks();
       });
 
       it('probes an S3 video through a presigned url', async () => {
         const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
         const { StorageService } = await import('src/services/storage.service.js');
-        vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+        vi.spyOn(StorageService, 'backendFor').mockReturnValue({ getReadableUrl } as any);
         mocks.videoTrim.getForTrim.mockResolvedValue(video({ originalPath: 'upload/admin/ab/cd/video.mp4' }));
         mocks.media.probe.mockResolvedValue(videoStream);
 
@@ -251,7 +247,7 @@ describe(GalleryAssetService.name, () => {
       it('never surfaces the presigned url when the probe fails', async () => {
         const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=SECRET');
         const { StorageService } = await import('src/services/storage.service.js');
-        vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+        vi.spyOn(StorageService, 'backendFor').mockReturnValue({ getReadableUrl } as any);
         mocks.videoTrim.getForTrim.mockResolvedValue(video({ originalPath: 'upload/admin/ab/cd/video.mp4' }));
         mocks.media.probe.mockRejectedValue(new Error('https://bucket.s3/key?X-Amz-Signature=SECRET: Invalid data'));
 

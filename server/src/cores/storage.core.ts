@@ -1,5 +1,6 @@
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { VideoInterfaces } from 'src/types.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { StorageAsset } from 'src/database.js';
 import {
   AssetFileType,
@@ -204,7 +205,8 @@ export class StorageCore {
       return;
     }
 
-    if (!isAbsolute(oldPath)) {
+    // fs.rename only moves disk files; a backend key stays where its backend put it
+    if (!isDiskPath(oldPath)) {
       return;
     }
 

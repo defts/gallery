@@ -1,10 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { isUndefined, omitBy } from 'lodash-es';
 import { DateTime, Duration } from 'luxon';
-import { isAbsolute } from 'node:path';
 import type { AssetFile } from 'src/database.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
+import { isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetResponseDto, SanitizedAssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import {
@@ -43,7 +43,6 @@ import { applyAssetResponseOverlay } from 'src/gallery/asset-response-overlay.js
 import { applyVisibilityTransitionSideEffects } from 'src/gallery/asset-visibility-transition.service.js';
 import { updateAssetFavorites } from 'src/gallery/gallery-asset.service.js';
 import { BaseService } from 'src/services/base.service.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { requireElevatedPermission } from 'src/utils/access.js';
 import {
   getAssetFiles,
@@ -435,11 +434,11 @@ export class AssetService extends BaseService {
 
     const { localPath, cleanup } = await this.backendMedia.ensureLocalFile(sourceFile.path);
     try {
-      if (isAbsolute(targetSidecarPath)) {
+      if (isDiskPath(targetSidecarPath)) {
         this.storageCore.ensureFolders(targetSidecarPath);
         await this.storageRepository.copyFile(localPath, targetSidecarPath);
       } else {
-        const backend = StorageService.resolveBackendForKey(targetSidecarPath);
+        const backend = await this.backendMedia.backendFor(targetSidecarPath);
         const stream = this.storageRepository.createPlainReadStream(localPath);
         await backend.put(targetSidecarPath, stream, { contentType: 'application/xml' });
       }

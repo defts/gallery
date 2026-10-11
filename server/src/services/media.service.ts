@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { randomUUID } from 'node:crypto';
-import { isAbsolute } from 'node:path';
 import type {
   AudioStreamInfo,
   DecodeToBufferOptions,
@@ -191,12 +190,6 @@ export class MediaService extends BaseService {
     const asset = await this.assetJobRepository.getForMigrationJob(id);
     if (!asset) {
       return JobStatus.Failed;
-    }
-
-    if (!asset.originalPath || !isAbsolute(asset.originalPath)) {
-      // S3 assets live under relative keys and are managed by the S3 backend, not fs.rename.
-      this.logger.debug(`Skipping asset file migration for S3 asset ${id}`);
-      return JobStatus.Skipped;
     }
 
     await this.storageCore.moveAssetImage(asset, AssetFileType.FullSize, image.fullsize.format);

@@ -54,7 +54,7 @@ const stageS3 = async () => {
   const cleanup = vi.fn().mockResolvedValue(void 0);
   const backend = { downloadToTemp: vi.fn().mockResolvedValue({ tempPath: '/tmp/a.jpg', cleanup }) };
   const { StorageService } = await import('src/services/storage.service.js');
-  vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+  vi.spyOn(StorageService, 'backendFor').mockReturnValue(backend as any);
   return { backend, cleanup };
 };
 

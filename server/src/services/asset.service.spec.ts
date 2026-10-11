@@ -2428,7 +2428,7 @@ describe(AssetService.name, () => {
     it('disk → S3: uploads via backend.put', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({ sourceAsset: { files: [diskSource] }, targetAsset: s3TargetAsset });
 
@@ -2449,7 +2449,7 @@ describe(AssetService.name, () => {
     it('S3 → S3: downloads source then uploads to target', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset });
 
@@ -2465,7 +2465,7 @@ describe(AssetService.name, () => {
       const target = { ...s3TargetAsset, files: [existingTarget] };
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       const sourceStream = Readable.from(['<xml/>']);
       mocks.storage.createPlainReadStream.mockReturnValue(sourceStream);
@@ -2485,7 +2485,7 @@ describe(AssetService.name, () => {
     it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({
         sourceAsset: { files: [diskSource] },
@@ -2498,7 +2498,7 @@ describe(AssetService.name, () => {
     it('succeeds when targetAsset.files is undefined (not just empty)', async () => {
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await (sut as any).copySidecar({
         sourceAsset: { files: [s3Source] },
@@ -2522,7 +2522,7 @@ describe(AssetService.name, () => {
     it('calls cleanup when backend.put fails', async () => {
       const backendPut = vi.fn().mockRejectedValue(new Error('S3 down'));
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+      vi.spyOn(StorageService, 'backendFor').mockReturnValue({ put: backendPut } as any);
 
       await expect(
         (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset }),

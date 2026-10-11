@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
 import type { JobOf, SystemFlags } from 'src/types.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { DiskStorageBackend, isDiskPath } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend.js';
-import { resolveBackend } from 'src/backends/storage-backend.provider.js';
 import { ErrorMessages } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
@@ -43,11 +42,16 @@ export class StorageService extends BaseService {
     return StorageService.diskBackend;
   }
 
-  static resolveBackendForKey(key: string): StorageBackend {
-    if (StorageService.s3Backend) {
-      return resolveBackend(key, StorageService.diskBackend, StorageService.s3Backend);
+  /**
+   * The one place that picks the backend for a stored path: a disk path (isDiskPath) is a disk file, a relative
+   * key lives on S3 when S3 is configured and under the media location otherwise. `absoluteDisk` lets a caller
+   * read disk paths through its own StorageRepository (see BackendMediaServer.backendFor).
+   */
+  static backendFor(key: string, absoluteDisk: StorageBackend = StorageService.diskBackend): StorageBackend {
+    if (isDiskPath(key)) {
+      return absoluteDisk;
     }
-    return StorageService.diskBackend;
+    return StorageService.s3Backend ?? StorageService.diskBackend;
   }
 
   private detectMediaLocation(): string {
