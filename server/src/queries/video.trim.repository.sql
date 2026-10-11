@@ -38,7 +38,7 @@ delete from "asset_video_trim"
 where
   "assetId" = $1::uuid
 returning
-  "id"
+  "assetId"
 
 -- VideoTrimRepository.setDuration
 with

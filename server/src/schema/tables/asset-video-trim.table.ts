@@ -1,4 +1,4 @@
-import { Column, ForeignKeyColumn, type Generated, PrimaryGeneratedColumn, Table } from '@immich/sql-tools';
+import { Column, ForeignKeyColumn, Table } from '@immich/sql-tools';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 
 // A video's trim, kept beside the asset so asset.duration and asset_edit stay upstream-shaped: asset.duration is
@@ -6,10 +6,7 @@ import { AssetTable } from 'src/schema/tables/asset.table.js';
 // `duration` (the probed length of that file) in its place.
 @Table('asset_video_trim')
 export class AssetVideoTrimTable {
-  @PrimaryGeneratedColumn()
-  id!: Generated<string>;
-
-  @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', unique: true, index: false })
+  @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true, index: false })
   assetId!: string;
 
   @Column({ type: 'double precision' })

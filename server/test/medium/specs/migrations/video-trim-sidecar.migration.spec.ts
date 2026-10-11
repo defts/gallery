@@ -55,14 +55,14 @@ describe('1798900000000-MoveVideoTrimToSidecar', () => {
 
     await moveTrim.up(db);
 
-    const { rows: sidecar } = await sql<{ id: string; assetId: string; startTime: number; endTime: number }>`
+    const { rows: sidecar } = await sql<{ assetId: string; startTime: number; endTime: number }>`
       SELECT * FROM asset_video_trim ORDER BY "startTime"
     `.execute(db);
     expect(sidecar).toEqual(
       expect.arrayContaining([
-        { id: trimmedEdit, assetId: trimmed.id, startTime: 5, endTime: 25, duration: 19_500 },
-        { id: pendingEdit, assetId: pending.id, startTime: 1, endTime: 4, duration: null },
-        { id: legacyEdit, assetId: legacy.id, startTime: 0, endTime: 8, duration: 8000 },
+        { assetId: trimmed.id, startTime: 5, endTime: 25, duration: 19_500 },
+        { assetId: pending.id, startTime: 1, endTime: 4, duration: null },
+        { assetId: legacy.id, startTime: 0, endTime: 8, duration: 8000 },
       ]),
     );
     expect(sidecar).toHaveLength(3);
@@ -83,13 +83,13 @@ describe('1798900000000-MoveVideoTrimToSidecar', () => {
 
     await moveTrim.down(db);
 
-    const { rows: restored } = await sql<{ id: string; assetId: string; parameters: Record<string, number> }>`
-      SELECT id, "assetId", parameters FROM asset_edit WHERE action = 'trim'
+    const { rows: restored } = await sql<{ assetId: string; parameters: Record<string, number> }>`
+      SELECT "assetId", parameters FROM asset_edit WHERE action = 'trim'
     `.execute(db);
     expect(restored).toEqual(
       expect.arrayContaining([
-        { id: trimmedEdit, assetId: trimmed.id, parameters: { startTime: 5, endTime: 25, originalDuration: 30 } },
-        { id: pendingEdit, assetId: pending.id, parameters: { startTime: 1, endTime: 4, originalDuration: 30 } },
+        { assetId: trimmed.id, parameters: { startTime: 5, endTime: 25, originalDuration: 30 } },
+        { assetId: pending.id, parameters: { startTime: 1, endTime: 4, originalDuration: 30 } },
       ]),
     );
     const reverted = await assets(ids);
@@ -112,10 +112,10 @@ describe('1798900000000-MoveVideoTrimToSidecar', () => {
 
     await moveTrim.up(db);
 
-    const { rows: sidecar } = await sql<{ id: string; startTime: number }>`
-      SELECT id, "startTime" FROM asset_video_trim WHERE "assetId" = ${asset.id}
+    const { rows: sidecar } = await sql<{ startTime: number }>`
+      SELECT "startTime" FROM asset_video_trim WHERE "assetId" = ${asset.id}
     `.execute(db);
-    expect(sidecar).toEqual([{ id: first, startTime: 5 }]);
+    expect(sidecar).toEqual([{ startTime: 5 }]);
     const { rows: edits } = await sql`SELECT id FROM asset_edit WHERE id IN (${first}, ${second})`.execute(db);
     expect(edits).toEqual([]);
   });

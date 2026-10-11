@@ -50,7 +50,7 @@ export class VideoTrimRepository {
     const deleted = await this.db
       .deleteFrom('asset_video_trim')
       .where('assetId', '=', asUuid(assetId))
-      .returning('id')
+      .returning('assetId')
       .executeTakeFirst();
     return !!deleted;
   }

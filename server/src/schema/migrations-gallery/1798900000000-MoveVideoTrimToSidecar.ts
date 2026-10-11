@@ -9,19 +9,16 @@ import { Kysely, sql } from 'kysely';
 // migration cannot tell it from a pending job, so it keeps showing that length until the next trim job.
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`CREATE TABLE "asset_video_trim" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
   "assetId" uuid NOT NULL,
   "startTime" double precision NOT NULL,
   "endTime" double precision NOT NULL,
   "duration" integer,
   CONSTRAINT "asset_video_trim_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "asset" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT "asset_video_trim_assetId_uq" UNIQUE ("assetId"),
-  CONSTRAINT "asset_video_trim_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "asset_video_trim_pkey" PRIMARY KEY ("assetId")
 );`.execute(db);
   await sql`
-    INSERT INTO "asset_video_trim" ("id", "assetId", "startTime", "endTime", "duration")
-    SELECT e."id",
-           e."assetId",
+    INSERT INTO "asset_video_trim" ("assetId", "startTime", "endTime", "duration")
+    SELECT e."assetId",
            (e."parameters"->>'startTime')::double precision,
            (e."parameters"->>'endTime')::double precision,
            CASE
@@ -53,9 +50,8 @@ export async function up(db: Kysely<any>): Promise<void> {
 
 export async function down(db: Kysely<any>): Promise<void> {
   await sql`
-    INSERT INTO "asset_edit" ("id", "assetId", "action", "parameters", "sequence")
-    SELECT t."id",
-           t."assetId",
+    INSERT INTO "asset_edit" ("assetId", "action", "parameters", "sequence")
+    SELECT t."assetId",
            'trim',
            jsonb_build_object('startTime', t."startTime", 'endTime', t."endTime", 'originalDuration', a."duration" / 1000.0),
            0
