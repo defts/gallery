@@ -59,7 +59,7 @@ An earlier Gallery release refuses to start on a database that has Gallery migra
    docker compose exec database psql -U postgres -d immich -c 'SELECT "name" FROM "gallery_migrations" ORDER BY "name" DESC LIMIT 20;'
    ```
 
-5. Undo the newest Gallery migration with the current image, and repeat until the newest name left is the one from step 3. Each run logs `Reverted migration "<name>"`. Do not run it once more: when no Gallery migration is left to undo, it undoes an Immich migration.
+5. Undo the newest Gallery migration with the current image, and repeat until the newest name left is the one from step 3. Each run logs `Reverted migration "<name>"`. Do not run it once more: when no Gallery migration is left to undo, it undoes one of the base database migrations Gallery shares with its upstream project.
 
    ```bash
    docker compose run --rm immich-server "node server/dist/bin/gallery-migrations.js revert"
