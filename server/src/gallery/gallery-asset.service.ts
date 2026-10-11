@@ -115,8 +115,13 @@ export class GalleryAssetService extends BaseService {
       throw new BadRequestException('End time exceeds video duration');
     }
 
-    if (dto.startTime === 0 && dto.endTime >= durationSeconds && asset.startTime === null) {
-      throw new BadRequestException('Trim must actually remove content');
+    if (dto.startTime === 0 && dto.endTime >= durationSeconds) {
+      if (asset.startTime === null) {
+        throw new BadRequestException('Trim must actually remove content');
+      }
+      // Web sends the full range when the handles are dragged back out: that is an undo, not a full-length re-encode.
+      await this.removeTrim(auth, id);
+      return { startTime: 0, endTime: durationSeconds, originalDuration: durationSeconds };
     }
 
     await this.videoTrimRepository.upsert(id, dto.startTime, dto.endTime);

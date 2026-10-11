@@ -167,13 +167,24 @@ describe(GalleryAssetService.name, () => {
         expect(mocks.videoTrim.upsert).toHaveBeenCalledWith(assetId, 5, 25);
       });
 
-      it('allows the full range when it undoes an existing trim', async () => {
+      it('removes an existing trim when given the full range, like DELETE', async () => {
         mocks.videoTrim.getForTrim.mockResolvedValue(video({ startTime: 10, endTime: 20 }));
         mocks.media.probe.mockResolvedValue(videoStream);
+        mocks.videoTrim.delete.mockResolvedValue(true);
 
-        await sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 30 });
+        await expect(sut.setTrim(authStub.admin, assetId, { startTime: 0, endTime: 30 })).resolves.toEqual({
+          startTime: 0,
+          endTime: 30,
+          originalDuration: 30,
+        });
 
-        expect(mocks.videoTrim.upsert).toHaveBeenCalledWith(assetId, 0, 30);
+        expect(mocks.videoTrim.upsert).not.toHaveBeenCalled();
+        expect(mocks.videoTrim.delete).toHaveBeenCalledWith(assetId);
+        expect(mocks.asset.update).toHaveBeenCalledWith({ id: assetId, isEdited: false });
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.AssetEditThumbnailGeneration,
+          data: { id: assetId },
+        });
       });
 
       it.each([

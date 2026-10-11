@@ -60,7 +60,7 @@ export class GalleryAssetController {
   @Endpoint({
     summary: 'Trim a video',
     description:
-      'Keeps only the part of the video between startTime and endTime, replacing any earlier trim. The original file is not changed.',
+      'Keeps only the part of the video between startTime and endTime, replacing any earlier trim. The full range removes an earlier trim. The original file is not changed.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
   updateAssetTrim(
