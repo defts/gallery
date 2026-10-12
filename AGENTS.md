@@ -248,7 +248,7 @@ git log origin/main..HEAD --format=%B | grep -nE '(^|[^0-9A-Za-z_/-])#[0-9]{5,}|
 - **Match each file's existing register and terminology.** The German, Italian and Spanish files address the user informally (`du` / `tu` / `tú`); French and Russian use the formal `vous` / `вы`. Reuse the word the file already uses for a concept: look up the nearest existing key instead of inventing a synonym.
 - **Mind gender agreement** when the subject is a noun the file already translates: `la barre latérale` and `боковая панель` are feminine, `panel boczny` masculine, so "Always compact" inflects differently in each.
 - Keys are **alphabetically sorted**, 2-space indent, unescaped Unicode. Insert in place rather than appending, then run `npx prettier --write i18n/`, which covers the overlay. CI checks the formatting.
-- The other overlay locales are left to translators (the Gallery Weblate component); do not hand-edit them.
+- Gallery has no translation service of its own: fork strings in the other locales fall back to English, and only the nine above are maintained. Upstream's strings in every locale arrive with each rebase, translated through Immich's Weblate.
 
 ## OpenAPI workflow
 
