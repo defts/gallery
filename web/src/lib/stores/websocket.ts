@@ -12,6 +12,7 @@ import { isEqual } from 'lodash-es';
 import { io, type Socket } from 'socket.io-client';
 import { get, writable } from 'svelte/store';
 import { page } from '$app/state';
+import { galleryAppHeader } from '$lib/gallery/client-header';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { queryClient } from '$lib/queries/client';
@@ -54,6 +55,8 @@ const websocket: Socket<Events> = io({
   reconnection: true,
   forceNew: true,
   autoConnect: false,
+  // browsers cannot set headers on a websocket upgrade, so the marker travels in the handshake auth payload
+  auth: galleryAppHeader,
 });
 
 export const websocketStore = {

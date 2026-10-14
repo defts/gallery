@@ -1,5 +1,6 @@
-import { setFetch } from '@immich/sdk';
+import { setFetch, setHeaders } from '@immich/sdk';
 import { memoize } from 'lodash-es';
+import { galleryAppHeader } from '$lib/gallery/client-header';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { queryClient } from '$lib/queries/client';
@@ -14,6 +15,7 @@ async function _init(fetch: Fetch) {
   // https://kit.svelte.dev/docs/load#making-fetch-requests
   // https://github.com/oazapfts/oazapfts/blob/main/README.md#fetch-options
   setFetch(fetch);
+  setHeaders(galleryAppHeader);
   await initLanguage();
   const serverConfig = await queryClient.query(getServerConfigQuery());
   await authManager.load();
