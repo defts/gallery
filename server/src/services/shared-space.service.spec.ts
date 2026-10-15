@@ -10087,8 +10087,8 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
 
       await expect(
         sut.reassignSpacePersonFaces(auth, spaceId, personId, {
@@ -10097,8 +10097,8 @@ describe(SharedSpaceService.name, () => {
         }),
       ).rejects.toThrow(BadRequestException);
 
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([globalPersonId]));
-      expect(mocks.access.person.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
+      expect(mocks.access.galleryPerson.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([globalPersonId]));
+      expect(mocks.access.galleryPerson.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
         auth.user.id,
         new Set([globalPersonId]),
       );
@@ -10120,14 +10120,14 @@ describe(SharedSpaceService.name, () => {
       const faces = [{ assetFaceId: newUuid(), assetId: assetIds[0], personId, assetOwnerId: auth.user.id }];
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([globalPersonId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set([globalPersonId]));
       mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue(faces as any);
 
       const target = { type: 'existing' as const, profile: { type: 'person' as const, id: globalPersonId } };
       const result = await sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target });
 
       // The owner fast path must short-circuit the shared-space-edit check entirely.
-      expect(mocks.access.person.checkSharedSpaceEditAccess).not.toHaveBeenCalled();
+      expect(mocks.access.galleryPerson.checkSharedSpaceEditAccess).not.toHaveBeenCalled();
       expect(identityMergePropagation.reassignSpaceFacesToTarget).toHaveBeenCalledWith(faces, target);
       expect(result).toEqual({ reassigned: 2 });
     });
@@ -10150,14 +10150,14 @@ describe(SharedSpaceService.name, () => {
       const faces = [{ assetFaceId: newUuid(), assetId: assetIds[0], personId, assetOwnerId: auth.user.id }];
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(factory.sharedSpacePerson({ id: personId, spaceId }));
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set([globalPersonId]));
+      mocks.access.galleryPerson.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.galleryPerson.checkSharedSpaceEditAccess.mockResolvedValue(new Set([globalPersonId]));
       mocks.sharedSpace.getSourceFacesForSpacePersonAssets.mockResolvedValue(faces as any);
 
       const target = { type: 'existing' as const, profile: { type: 'person' as const, id: globalPersonId } };
       const result = await sut.reassignSpacePersonFaces(auth, spaceId, personId, { assetIds, target });
 
-      expect(mocks.access.person.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
+      expect(mocks.access.galleryPerson.checkSharedSpaceEditAccess).toHaveBeenCalledWith(
         auth.user.id,
         new Set([globalPersonId]),
       );

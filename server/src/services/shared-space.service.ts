@@ -3140,9 +3140,9 @@ export class SharedSpaceService extends BaseService {
         // an arbitrary stranger's person by passing any UUID. Mirrors PersonService's reassign target
         // gate: owner fast path, then shared-space Editor access.
         const ids = new Set([profile.id]);
-        const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+        const isOwner = await this.accessRepository.galleryPerson.checkOwnerAccess(auth.user.id, ids);
         if (!isOwner.has(profile.id)) {
-          const canEdit = await this.accessRepository.person.checkSharedSpaceEditAccess(auth.user.id, ids);
+          const canEdit = await this.accessRepository.galleryPerson.checkSharedSpaceEditAccess(auth.user.id, ids);
           if (!canEdit.has(profile.id)) {
             throw new BadRequestException('Not found or no person.update access');
           }

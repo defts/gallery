@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { Mocked, vi } from 'vitest';
 import { AssetVisibility, JobName, SharedSpaceRole } from 'src/enum.js';
+import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
@@ -50,12 +51,12 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
       SharedSpaceRepository,
       SystemMetadataRepository,
     ],
-    mock: [JobRepository, LoggingRepository],
+    mock: [JobRepository, LoggingRepository, QueueMaintenanceRepository],
   });
   const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
-  jobs.hasInFlightDedupChain.mockResolvedValue(false);
+  ctx.getMock(QueueMaintenanceRepository).hasInFlightDedupChain.mockResolvedValue(false);
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository), jobs };
 };
 
@@ -436,9 +437,10 @@ describe('Shared space person face reassign (#765)', () => {
     // duplicate entirely.
     const ownerAlignedPeople = await fx.ctx.database
       .selectFrom('person')
-      .select(['personGroupId', 'ownerId', 'identityId'])
-      .where('ownerId', '=', fx.owner.id)
-      .where('identityId', '=', fx.grandma.identity.id)
+      .innerJoin('person_identity', 'person_identity.personGroupId', 'person.personGroupId')
+      .select(['person.personGroupId', 'person.ownerId', 'person_identity.identityId'])
+      .where('person.ownerId', '=', fx.owner.id)
+      .where('person_identity.identityId', '=', fx.grandma.identity.id)
       .execute();
     expect(ownerAlignedPeople).toHaveLength(1);
     const ownerAlignedPerson = ownerAlignedPeople[0];

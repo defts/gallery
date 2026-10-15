@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable, NoResultError } from 'kysely';
 import type { AccessibleIdentityFaceMatch } from 'src/repositories/face-identity.repository.js';
 import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
@@ -965,12 +965,12 @@ export class PersonService extends BaseService {
   // person is shared through. Viewers hold PersonRead only and stay denied.
   private async requireReassignTargetAccess(auth: AuthDto, personId: string): Promise<void> {
     const ids = new Set([personId]);
-    const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+    const isOwner = await this.accessRepository.galleryPerson.checkOwnerAccess(auth.user.id, ids);
     if (isOwner.has(personId)) {
       return;
     }
 
-    const canEdit = await this.accessRepository.person.checkSharedSpaceEditAccess(auth.user.id, ids);
+    const canEdit = await this.accessRepository.galleryPerson.checkSharedSpaceEditAccess(auth.user.id, ids);
     if (!canEdit.has(personId)) {
       throw new BadRequestException('Not found or no person.update access');
     }
