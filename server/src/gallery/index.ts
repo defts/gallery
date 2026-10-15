@@ -5,6 +5,7 @@ import { GalleryMapController } from 'src/controllers/gallery-map.controller.js'
 import { LibraryManifestController } from 'src/controllers/library-manifest.controller.js';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
+import { UploadSessionController } from 'src/controllers/upload-session.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
@@ -43,6 +44,7 @@ import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { PetRecognitionService } from 'src/services/pet-recognition.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
+import { UploadSessionService } from 'src/services/upload-session.service.js';
 import { UserGroupService } from 'src/services/user-group.service.js';
 
 // Register every fork controller, repository and service here, never in the upstream arrays this is spread into
@@ -59,6 +61,7 @@ export const galleryControllers = [
   LibraryManifestController,
   SharedSpaceController,
   StorageMigrationController,
+  UploadSessionController,
   UserGroupController,
 ];
 
@@ -101,5 +104,6 @@ export const galleryServices = [
   SharedSpaceService,
   StorageMigrationService,
   StorageUsageService,
+  UploadSessionService,
   UserGroupService,
 ];
