@@ -29,6 +29,7 @@ import { AuthGuard } from 'src/middleware/auth.guard.js';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor.js';
 import { GlobalExceptionFilter } from 'src/middleware/global-exception.filter.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 import { ActivityRepository } from 'src/repositories/activity.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -331,6 +332,7 @@ export type ServiceOverrides = {
   faceSearch: FaceSearchRepository;
   gallerySync: GallerySyncRepository;
   videoTrim: VideoTrimRepository;
+  game: GameRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -449,6 +451,7 @@ export const getMocks = () => {
     faceSearch: automock(FaceSearchRepository, { strict: false }),
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { strict: false }),
+    game: automock(GameRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -540,6 +543,7 @@ export const newTestService = <T extends BaseService>(
     overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
     overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
     overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
+    overrides.game || (mocks.game as As<GameRepository>),
   );
 
   return {
