@@ -26,8 +26,6 @@ const double _memoryLaneHeight = 200;
 class MainTimelinePage extends ConsumerStatefulWidget {
   const MainTimelinePage({super.key});
 
-  static const timelineOverviewControlsEnabled = true;
-
   @override
   ConsumerState<MainTimelinePage> createState() => _MainTimelinePageState();
 }
