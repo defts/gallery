@@ -1,7 +1,7 @@
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,23 @@ vi.mock('$app/state', async () => {
 });
 
 vi.mock('$lib/utils/handle-error', () => ({ handleError: vi.fn() }));
+
+// The Details panel loads the asset; nothing here is about its rows (suggestion-asset-details.spec.ts is).
+const getAssetMock = vi.hoisted(() => vi.fn());
+vi.mock('$lib/managers/AssetCacheManager.svelte', () => ({ assetCacheManager: { getAsset: getAssetMock } }));
+
+// `MediaQuery` reads matchMedia once at mount; stub it to the screen width a test is about.
+function screenIsWide(wide: boolean) {
+  vi.spyOn(globalThis, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: wide,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+}
 
 vi.mock('@immich/ui', async (importOriginal: () => Promise<typeof import('@immich/ui')>) => {
   const actual = await importOriginal();
@@ -274,6 +291,52 @@ describe('PersonSuggestionReviewModal', () => {
     await userEvent.keyboard('o');
     expect(open).toHaveBeenCalledWith('/spaces/s1/photos/asset-f1', '_blank', 'noopener');
     open.mockRestore();
+  });
+
+  // #1079 user feedback: with Details open, the stacked panel pushed the two face crops (the comparison
+  // itself) below the fold. A wide screen now puts the panel beside the photo, with the crops under it.
+  describe('Details layout', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      faceSuggestionContextExpanded.set(false);
+    });
+
+    it('collapsed: no panel, and nothing is loaded for it', async () => {
+      faceSuggestionContextExpanded.set(false);
+      getAssetMock.mockClear();
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      expect(screen.queryByTestId('suggestion-context-details')).not.toBeInTheDocument();
+      expect(getAssetMock).not.toHaveBeenCalled();
+    });
+
+    it('open on a wide screen: the panel and the face crops sit in a column beside the photo', async () => {
+      screenIsWide(true);
+      faceSuggestionContextExpanded.set(true);
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      const layout = screen.getByTestId('suggestion-layout');
+      expect(layout).toHaveAttribute('data-beside', 'true');
+      const [photoColumn, sideColumn] = [...layout.children];
+      expect(within(photoColumn as HTMLElement).getByTestId('suggestion-full-photo')).toBeInTheDocument();
+      expect(within(sideColumn as HTMLElement).getByTestId('suggestion-context-details')).toBeInTheDocument();
+      expect(within(sideColumn as HTMLElement).getByTestId('suggestion-reference')).toBeInTheDocument();
+      expect(screen.getAllByTestId('suggestion-reference')).toHaveLength(1);
+    });
+
+    it('open on a narrow screen: everything stays stacked under the photo', async () => {
+      screenIsWide(false);
+      faceSuggestionContextExpanded.set(true);
+      setup();
+      await waitFor(() => screen.getByTestId('suggestion-full-photo'));
+
+      const layout = screen.getByTestId('suggestion-layout');
+      expect(layout).toHaveAttribute('data-beside', 'false');
+      expect(layout.children).toHaveLength(1);
+      expect(within(layout).getByTestId('suggestion-context-details')).toBeInTheDocument();
+    });
   });
 
   it('shows each verdict’s key on its button', async () => {

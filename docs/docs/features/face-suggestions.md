@@ -32,7 +32,7 @@ The difference between the last two is worth knowing. **Different person** is a 
 Dismissing a suggestion hides the _suggestion_, not the face. If a future, more confident match brings that same face inside the automatic-recognition threshold, it can still be auto-assigned. That is by design: saying "different person" once should never permanently block normal recognition.
 :::
 
-Below the photo is the date it was taken and an **Open photo** link, which opens the photo in a new tab so your place in the review is kept. **Details** expands the capture time, file, place, camera, the albums the photo is in, and the people already recognised in it. Knowing who else is in the frame is often the quickest way to settle a borderline face. Details stays open or closed for the next face, and the next time you review.
+Below the photo is the date it was taken and an **Open photo** link, which opens the photo in a new tab so your place in the review is kept. **Details** expands the capture time, file, place, camera, the albums the photo is in, and the people already recognised in it. Knowing who else is in the frame is often the quickest way to settle a borderline face. On a wide screen the details open beside the photo, with the two faces under them, so everything stays in view. Details stays open or closed for the next face, and the next time you review.
 
 ### Keyboard shortcuts
 

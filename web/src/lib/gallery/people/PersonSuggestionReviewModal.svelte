@@ -5,6 +5,7 @@
   import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
   import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
   import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
+  import SuggestionAssetSummary from '$lib/gallery/people/suggestion-asset-summary.svelte';
   import { getSuggestionAssetHref } from '$lib/gallery/people/suggestion-asset-href';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
@@ -28,7 +29,7 @@
     mdiKeyboardOutline,
   } from '@mdi/js';
   import { onMount } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { MediaQuery, SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   type PageReq = { page: number; size: number };
@@ -230,6 +231,12 @@
     ],
   });
 
+  // With Details open on a wide screen the panel sits BESIDE the photo, with the two face crops under it:
+  // stacked, Details pushed the crops (the comparison itself) below the fold. Below `lg` there is no width
+  // to spare, so it stays stacked and the body scrolls.
+  const wide = new MediaQuery('min-width: 1024px');
+  const beside = $derived($faceSuggestionContextExpanded && wide.current);
+
   // The overlay is a modal over this modal; while it is up, `s`/`d`/`i` must not judge the face hidden behind it.
   let shortcutsOpen = $state(false);
 
@@ -264,11 +271,31 @@
       ]}
 />
 
+{#snippet faceComparison(face: PersonFaceSuggestionResponseDto)}
+  <div class="mx-auto flex items-end gap-6">
+    <div class="flex flex-col items-center gap-1">
+      <img
+        data-testid="suggestion-reference"
+        src={referenceThumbnailUrl}
+        alt={$t('face_suggestion_reference')}
+        class="size-24 rounded-lg object-cover"
+      />
+      <span class="text-xs text-gray-500 dark:text-gray-400">{$t('face_suggestion_reference')}</span>
+    </div>
+    <div class="flex flex-col items-center gap-1">
+      <div class="size-24">
+        <FaceCrop {face} label={$t('face_suggestion_candidate')} />
+      </div>
+      <span class="text-xs text-gray-500 dark:text-gray-400">{$t('face_suggestion_candidate')}</span>
+    </div>
+  </div>
+{/snippet}
+
 <Modal
   title={person.name
     ? $t('face_suggestion_modal_title', { values: { name: person.name } })
     : $t('face_suggestion_modal_title_unnamed')}
-  size="large"
+  size={beside ? 'giant' : 'large'}
   onClose={() => onClose({ confirmed })}
 >
   <ModalBody>
@@ -276,108 +303,117 @@
       {#if loading}
         <div data-testid="suggestion-loading" class="h-96 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800"></div>
       {:else if current}
-        <div class="flex flex-col gap-4">
-          <div class="relative flex items-center justify-center">
-            <p
-              data-testid="suggestion-progress"
-              data-current={index + 1}
-              data-total={displayTotal}
-              aria-live="polite"
-              class="text-center text-sm text-gray-500 dark:text-gray-400"
-            >
-              {$t('face_suggestion_progress', { values: { current: index + 1, total: displayTotal } })}
-            </p>
-            <!-- Touch-only devices have no keyboard to use the list on. -->
-            <IconButton
-              class="absolute inset-e-0 hidden pointer-fine:flex"
-              variant="ghost"
-              shape="round"
-              size="small"
-              color="secondary"
-              icon={mdiKeyboardOutline}
-              aria-label={$t('show_keyboard_shortcuts')}
-              title={$t('show_keyboard_shortcuts')}
-              data-testid="suggestion-shortcuts-btn"
-              onclick={() => void showShortcuts()}
-            />
-          </div>
+        <div
+          class={beside ? 'grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-6' : 'flex flex-col gap-4'}
+          data-testid="suggestion-layout"
+          data-beside={beside}
+        >
+          <div class="flex min-w-0 flex-col gap-4">
+            <div class="flex flex-col gap-1">
+              <div class="relative flex items-center justify-center">
+                <p
+                  data-testid="suggestion-progress"
+                  data-current={index + 1}
+                  data-total={displayTotal}
+                  aria-live="polite"
+                  class="text-center text-sm text-gray-500 dark:text-gray-400"
+                >
+                  {$t('face_suggestion_progress', { values: { current: index + 1, total: displayTotal } })}
+                </p>
+                <!-- Touch-only devices have no keyboard to use the list on. -->
+                <IconButton
+                  class="absolute inset-e-0 hidden pointer-fine:flex"
+                  variant="ghost"
+                  shape="round"
+                  size="small"
+                  color="secondary"
+                  icon={mdiKeyboardOutline}
+                  aria-label={$t('show_keyboard_shortcuts')}
+                  title={$t('show_keyboard_shortcuts')}
+                  data-testid="suggestion-shortcuts-btn"
+                  onclick={() => void showShortcuts()}
+                />
+              </div>
 
-          {#if currentActed}
-            <p
-              data-testid="suggestion-reviewed-badge"
-              class="text-center text-xs font-semibold text-green-600 dark:text-green-400"
-            >
-              {$t('face_suggestion_reviewed')}
-            </p>
-          {/if}
+              {#if currentActed}
+                <p
+                  data-testid="suggestion-reviewed-badge"
+                  class="text-center text-xs font-semibold text-green-600 dark:text-green-400"
+                >
+                  {$t('face_suggestion_reviewed')}
+                </p>
+              {/if}
+            </div>
 
-          <!--
+            <!--
             The stacked footer costs ~100px on a phone; capping the context photo lower there keeps it, both
             face crops and the buttons on screen together, which is the whole comparison the user is making.
           -->
-          <div class="relative mx-auto max-h-[40vh] sm:max-h-[60vh]">
-            <img
-              bind:this={imgEl}
-              data-testid="suggestion-full-photo"
-              src={photoUrl}
-              alt={$t('face_suggestion_candidate')}
-              class="max-h-[40vh] w-auto rounded-lg object-contain sm:max-h-[60vh]"
-              onload={() => (imgReady = true)}
-            />
-            {#if highlight}
-              <svg class="pointer-events-none absolute inset-0 size-full">
-                <defs>
-                  <mask id="suggestion-dim-mask">
-                    <rect width="100%" height="100%" fill="white" />
-                    <rect
-                      x={highlight.left}
-                      y={highlight.top}
-                      width={highlight.width}
-                      height={highlight.height}
-                      rx="8"
-                      fill="black"
-                    />
-                  </mask>
-                </defs>
-                <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#suggestion-dim-mask)" />
-              </svg>
-              <div
-                data-testid="suggestion-highlight"
-                class="pointer-events-none absolute rounded-lg border-3 border-solid border-white"
-                style="top: {highlight.top}px; left: {highlight.left}px; width: {highlight.width}px; height: {highlight.height}px;"
-              ></div>
-            {:else}
-              <div data-testid="suggestion-highlight-placeholder" class="hidden"></div>
-            {/if}
-          </div>
+            <!-- Beside the panel the photo is wider, so its height is capped against the window instead: the header,
+               counter, summary row and footer take about 20rem, and the rest is the photo's. -->
+            <div class={['relative mx-auto', beside ? 'max-h-[calc(100vh-20rem)]' : 'max-h-[40vh] sm:max-h-[60vh]']}>
+              <img
+                bind:this={imgEl}
+                data-testid="suggestion-full-photo"
+                src={photoUrl}
+                alt={$t('face_suggestion_candidate')}
+                class={[
+                  'w-auto rounded-lg object-contain',
+                  beside ? 'max-h-[calc(100vh-20rem)]' : 'max-h-[40vh] sm:max-h-[60vh]',
+                ]}
+                onload={() => (imgReady = true)}
+              />
+              {#if highlight}
+                <svg class="pointer-events-none absolute inset-0 size-full">
+                  <defs>
+                    <mask id="suggestion-dim-mask">
+                      <rect width="100%" height="100%" fill="white" />
+                      <rect
+                        x={highlight.left}
+                        y={highlight.top}
+                        width={highlight.width}
+                        height={highlight.height}
+                        rx="8"
+                        fill="black"
+                      />
+                    </mask>
+                  </defs>
+                  <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#suggestion-dim-mask)" />
+                </svg>
+                <div
+                  data-testid="suggestion-highlight"
+                  class="pointer-events-none absolute rounded-lg border-3 border-solid border-white"
+                  style="top: {highlight.top}px; left: {highlight.left}px; width: {highlight.width}px; height: {highlight.height}px;"
+                ></div>
+              {:else}
+                <div data-testid="suggestion-highlight-placeholder" class="hidden"></div>
+              {/if}
+            </div>
 
-          <!-- #1039: the reviewer used to right-click the photo and open it in a new tab just to find the
+            <!-- #1039: the reviewer used to right-click the photo and open it in a new tab just to find the
                date. `spaceId` comes from the ROUTE, not from the person: `spaceId` is a param only the
                /spaces/… review has, and it decides which of two differently-permissioned asset routes the
                link may point at. -->
-          <SuggestionAssetDetails
-            assetId={current.assetId}
-            fileCreatedAt={current.fileCreatedAt}
-            spaceId={page.params.spaceId}
-          />
+            <SuggestionAssetSummary
+              assetId={current.assetId}
+              fileCreatedAt={current.fileCreatedAt}
+              spaceId={page.params.spaceId}
+            />
 
-          <div class="mx-auto flex items-end gap-6">
-            <div class="flex flex-col items-center gap-1">
-              <img
-                data-testid="suggestion-reference"
-                src={referenceThumbnailUrl}
-                alt={$t('face_suggestion_reference')}
-                class="size-24 rounded-lg object-cover"
-              />
-              <span class="text-xs text-gray-500 dark:text-gray-400">{$t('face_suggestion_reference')}</span>
-            </div>
-            <div class="flex flex-col items-center gap-1">
-              <div class="size-24">
-                <FaceCrop face={current} label={$t('face_suggestion_candidate')} />
-              </div>
-              <span class="text-xs text-gray-500 dark:text-gray-400">{$t('face_suggestion_candidate')}</span>
-            </div>
+            {#if !beside}
+              {#if $faceSuggestionContextExpanded}
+                <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="-mt-2" />
+              {/if}
+              {@render faceComparison(current)}
+            {/if}
           </div>
+
+          {#if beside}
+            <div class="flex flex-col gap-4">
+              <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="mt-0" />
+              {@render faceComparison(current)}
+            </div>
+          {/if}
         </div>
       {:else if allDone}
         <div data-testid="suggestion-all-done" class="flex h-96 flex-col items-center justify-center gap-2">
