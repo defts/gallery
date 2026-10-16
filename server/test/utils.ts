@@ -17,6 +17,7 @@ import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
@@ -331,6 +332,7 @@ export type ServiceOverrides = {
   faceSearch: FaceSearchRepository;
   gallerySync: GallerySyncRepository;
   videoTrim: VideoTrimRepository;
+  galleryPerson: GalleryPersonRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -449,6 +451,7 @@ export const getMocks = () => {
     faceSearch: automock(FaceSearchRepository, { strict: false }),
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { strict: false }),
+    galleryPerson: automock(GalleryPersonRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -540,6 +543,7 @@ export const newTestService = <T extends BaseService>(
     overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
     overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
     overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
+    overrides.galleryPerson || (mocks.galleryPerson as As<GalleryPersonRepository>),
   );
 
   return {
