@@ -6,7 +6,7 @@ import {
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -54,7 +54,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
   return {
     ...original,
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
-    toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+    toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn() },
   };
 });
 
@@ -471,6 +471,35 @@ describe('Space people page', () => {
         sharedSpacePersonMergeDto: { ids: ['space-person-unnamed'] },
       }),
     );
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+  });
+
+  // With cross-owner merges off (the default), an editor's merge of the admin's people is refused.
+  // The user asked for a merge, so falling back to the rename would create the duplicate anyway.
+  it('does not rename when the merge for a typed existing name is blocked', async () => {
+    vi.mocked(sdkMock.isHttpError).mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const norgy = makeSpacePerson({ id: 'space-person-norgy', name: 'Norgy' });
+    const unnamed = makeSpacePerson({ id: 'space-person-unnamed', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([norgy]);
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage([norgy, unnamed]);
+
+    const user = userEvent.setup();
+    const input = screen.getAllByPlaceholderText('add_a_name')[1];
+    await user.click(input);
+    await user.type(input, 'norgy');
+    await fireEvent.focusOut(input);
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    // The fallback rename, if any, runs after the toast; let it land before asserting it did not.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(1);
     expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
   });
 });

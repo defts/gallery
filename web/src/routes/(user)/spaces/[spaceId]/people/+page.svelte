@@ -22,7 +22,7 @@
   import { clearQueryParam } from '$lib/utils/navigation';
   import { peopleFilterToTypeParam as filterToTypeParam, resolvePeopleFilterBy } from '$lib/utils/people-filter';
   import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
-  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/utils/space-person-name-merge';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/gallery/people/space-person-name-merge';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
@@ -432,15 +432,15 @@
     existingPerson: SharedSpacePersonResponseDto,
     person: SharedSpacePersonResponseDto,
   ) => {
-    const committed = await confirmAndMergeSpacePerson({
+    const outcome = await confirmAndMergeSpacePerson({
       spaceId: space.id,
       sourceId: person.id,
       targetId: existingPerson.id,
     });
-    if (committed) {
+    if (outcome === 'merged') {
       await refreshPeople();
     }
-    return committed;
+    return outcome;
   };
 
   const searchNameSuggestions = async (name: string) => {
@@ -466,10 +466,11 @@
         return;
       }
       // Typing a name the space already has is almost always the same identity, so offer the merge
-      // first and only rename when it is declined (#1100).
+      // first and only rename when it is declined (#1100). A merge that was wanted but refused
+      // leaves the name alone: renaming then would create the duplicate.
       if (name.trim()) {
         const existingPerson = await findSpacePersonNamed(space.id, name, person.id);
-        if (existingPerson && (await mergeIntoExistingPerson(existingPerson, person))) {
+        if (existingPerson && (await mergeIntoExistingPerson(existingPerson, person)) !== 'declined') {
           return;
         }
       }

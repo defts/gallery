@@ -28,7 +28,7 @@
   import { handleError } from '$lib/utils/handle-error';
   import { locale } from '$lib/stores/preferences.store';
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
-  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/utils/space-person-name-merge';
+  import { confirmAndMergeSpacePerson, findSpacePersonNamed } from '$lib/gallery/people/space-person-name-merge';
   import { toScopedPersonRef as toPersonScopedRef } from '$lib/utils/scoped-person-ref';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
@@ -221,11 +221,18 @@
 
     try {
       // Typing a name the space already has is almost always the same identity, so offer the merge
-      // first and only rename when it is declined (#1100).
+      // first and only rename when it is declined (#1100). A merge that was wanted but refused
+      // leaves the name alone: renaming then would create the duplicate.
       if (editedName.trim()) {
         const existingPerson = await findSpacePersonNamed(space.id, editedName, person.id);
-        if (existingPerson && (await mergeIntoSuggestedPerson(existingPerson))) {
-          return;
+        if (existingPerson) {
+          const outcome = await mergeIntoSuggestedPerson(existingPerson);
+          if (outcome === 'failed') {
+            editedName = person.name;
+          }
+          if (outcome !== 'declined') {
+            return;
+          }
         }
       }
 
@@ -256,17 +263,17 @@
   };
 
   const mergeIntoSuggestedPerson = async (suggestedPerson: SharedSpacePersonResponseDto) => {
-    const committed = await confirmAndMergeSpacePerson({
+    const outcome = await confirmAndMergeSpacePerson({
       spaceId: space.id,
       sourceId: person.id,
       targetId: suggestedPerson.id,
     });
-    if (committed) {
+    if (outcome === 'merged') {
       // The current route person is the merge source and no longer exists; navigate
       // straight to the surviving suggested person instead of reloading a deleted route.
       await goto(getSpacePersonRoute(suggestedPerson.id), { replaceState: true });
     }
-    return committed;
+    return outcome;
   };
 
   const isSharedSpacePerson = (person: ScopedMergeCandidate): person is SharedSpacePersonResponseDto =>

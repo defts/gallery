@@ -12,6 +12,7 @@
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { PEOPLE_PAGE_SIZE, QueryParameter, SessionStorageKey } from '$lib/constants';
+  import { searchPeopleWithSharedSpaces } from '$lib/gallery/people/space-person-name-merge';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
@@ -414,15 +415,6 @@
     }
   };
 
-  const searchNameSuggestions = async (name: string) => {
-    try {
-      return await searchPerson({ name, withSharedSpaces: true });
-    } catch (error) {
-      handleError(error, $t('errors.cant_search_people'));
-      return [];
-    }
-  };
-
   const findPeopleWithSimilarName = async (name: string, personId: string) => {
     // Shared-space people too: an editor naming a space person owns none of the existing ones (#1100).
     const searchResult = await searchPerson({ name, withHidden: true, withSharedSpaces: true });
@@ -523,7 +515,7 @@
       canEditNames={canEditName}
       canShowActions={isPersonalPrimary}
       onNameSubmit={onNameChangeSubmit}
-      {searchNameSuggestions}
+      searchNameSuggestions={searchPeopleWithSharedSpaces}
       {onSuggestionSelect}
     >
       {#snippet actions(person)}

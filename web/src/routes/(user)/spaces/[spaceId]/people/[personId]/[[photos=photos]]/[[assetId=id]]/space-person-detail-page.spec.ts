@@ -701,6 +701,32 @@ describe('Spaces person detail page', () => {
     expect(sdkMock.mergeSpacePeople).not.toHaveBeenCalled();
   });
 
+  // The user asked for the merge; renaming after the server refused it would create the duplicate.
+  it('does not rename when the merge into the same-named space person is blocked', async () => {
+    sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+    const person = makePerson({ id: 'person-1', name: '' });
+    sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'person-2', name: 'Norgy' })]);
+    sdkMock.mergeSpacePeople.mockRejectedValueOnce({
+      __http: true,
+      status: 403,
+      data: { code: 'cross_owner_merge_blocked', message: 'An administrator can enable it.' },
+      message: 'raw',
+    });
+    vi.mocked(modalManager.showDialog).mockResolvedValue(true);
+    renderPage({ person });
+
+    await userEvent.click(screen.getByText('add_a_name'));
+    await userEvent.type(screen.getByPlaceholderText('add_a_name'), 'norgy');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => expect(toastManager.danger).toHaveBeenCalled());
+    // The fallback rename, if any, runs after the toast; let it land before asserting it did not.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sdkMock.mergeSpacePeople).toHaveBeenCalledTimes(1);
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
+    expect(gotoMock).not.toHaveBeenCalled();
+  });
+
   it('shows matching named space people while editing an unnamed person', async () => {
     const person = makePerson({ id: 'person-1', name: '' });
     const existingPerson = makePerson({ id: 'person-2', name: 'Alice Existing' });
