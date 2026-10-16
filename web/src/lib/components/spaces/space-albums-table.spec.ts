@@ -1,11 +1,12 @@
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { init, register, waitLocale } from 'svelte-i18n';
+import { init, register, t, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
 import { toggleSpaceAlbumGroupCollapsing } from '$lib/utils/space-album-grouping';
+import { getSpaceAlbumSortLabels, spaceAlbumSortOptionsMetadata } from '$lib/utils/space-album-sort';
 import { renderWithTooltips } from '$tests/helpers';
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -217,15 +218,10 @@ describe('SpaceAlbumsTable', () => {
         .map((header) => header.querySelector('button')?.textContent?.replaceAll(/[↓↑]/g, '').trim())
         .filter(Boolean);
 
-      expect(buttons).toEqual([
-        'Title',
-        'Number of items',
-        'Date modified',
-        'Created',
-        'Most recent photo',
-        'Oldest photo',
-        'Recently linked',
-      ]);
+      // The same labels, in the same order, as the space's sort menu.
+      const labels = getSpaceAlbumSortLabels(get(t));
+      expect(buttons).toEqual(spaceAlbumSortOptionsMetadata.map(({ id }) => labels[id]));
+      expect(buttons).toHaveLength(7);
     });
 
     it('sorts by a header on click, with its default direction, and flips it on a second click', async () => {
