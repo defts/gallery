@@ -349,18 +349,16 @@
             The stacked footer costs ~100px on a phone; capping the context photo lower there keeps it, both
             face crops and the buttons on screen together, which is the whole comparison the user is making.
           -->
-            <!-- Beside the panel the photo is capped against the window instead: the header, counter, summary
-               row, face crops and footer take about 29rem, and the rest is the photo's. -->
-            <div class={['relative mx-auto', beside ? 'max-h-[calc(100vh-29rem)]' : 'max-h-[40vh] sm:max-h-[60vh]']}>
+            <!-- The photo yields to the window: the header, counter, summary row, face crops and footer take about
+               29rem (31rem on a phone, whose footer stacks three buttons), and the photo gets the rest, up to 40vh
+               on a phone and 60vh above. A fixed 60vh photo left the crops half under the footer at 900px tall. -->
+            <div class="relative mx-auto max-h-[min(40vh,calc(100vh-31rem))] sm:max-h-[min(60vh,calc(100vh-29rem))]">
               <img
                 bind:this={imgEl}
                 data-testid="suggestion-full-photo"
                 src={photoUrl}
                 alt={$t('face_suggestion_candidate')}
-                class={[
-                  'w-auto rounded-lg object-contain',
-                  beside ? 'max-h-[calc(100vh-29rem)]' : 'max-h-[40vh] sm:max-h-[60vh]',
-                ]}
+                class="max-h-[min(40vh,calc(100vh-31rem))] w-auto rounded-lg object-contain sm:max-h-[min(60vh,calc(100vh-29rem))]"
                 onload={() => (imgReady = true)}
               />
               {#if highlight}
@@ -400,10 +398,12 @@
               spaceId={page.params.spaceId}
             />
 
-            {#if $faceSuggestionContextExpanded && !beside}
-              <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="-mt-2" />
-            {/if}
             {@render faceComparison(current)}
+            <!-- Stacked, the details go UNDER the two faces: the photo-to-faces comparison stays on screen and the
+                 details scroll in below it, rather than pushing the faces out of view. -->
+            {#if $faceSuggestionContextExpanded && !beside}
+              <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="mt-0" />
+            {/if}
           </div>
 
           {#if beside}
