@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import GeolocationPointPickerModal from '$lib/modals/GeolocationPointPickerModal.svelte';
   import { applyContextualFilter, buildContextualMapUrl } from '$lib/utils/filter-target';
   import { handleError } from '$lib/utils/handle-error';
@@ -122,8 +121,7 @@
     </div>
 
     <div class="flex items-center gap-1">
-      <!-- #1046 — with the map feature off, /map redirects to /photos, so the pin must not render. -->
-      {#if canFilter && mapUrl && featureFlagsManager.value.map}
+      {#if canFilter && mapUrl}
         <IconButton
           href={mapUrl}
           icon={mdiMapOutline}

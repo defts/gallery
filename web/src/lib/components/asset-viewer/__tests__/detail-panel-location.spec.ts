@@ -22,9 +22,9 @@ const { gotoMock, mockFeatureFlags } = vi.hoisted(() => ({
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
-// #1046 — the map pin is gated on the server's `map` feature flag.
+// #1046 — the map pin is gated on the server's `map` feature flag (read by buildContextualMapUrl).
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
-  featureFlagsManager: { value: mockFeatureFlags },
+  featureFlagsManager: { value: mockFeatureFlags, valueOrUndefined: mockFeatureFlags },
 }));
 
 // The map pin resolves the CURRENT surface (space / album / map / photos) from `page.url`, so the
