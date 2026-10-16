@@ -19,6 +19,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
@@ -337,6 +338,7 @@ export type ServiceOverrides = {
   storageUsage: StorageUsageRepository;
   galleryDuplicate: GalleryDuplicateRepository;
   galleryAsset: GalleryAssetRepository;
+  galleryPerson: GalleryPersonRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -458,6 +460,7 @@ export const getMocks = () => {
     storageUsage: automock(StorageUsageRepository, { strict: false }),
     galleryDuplicate: automock(GalleryDuplicateRepository, { strict: false }),
     galleryAsset: automock(GalleryAssetRepository, { strict: false }),
+    galleryPerson: automock(GalleryPersonRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -554,6 +557,7 @@ export const newTestService = <T extends BaseService>(
     overrides.storageUsage || (mocks.storageUsage as As<StorageUsageRepository>),
     overrides.galleryDuplicate || (mocks.galleryDuplicate as As<GalleryDuplicateRepository>),
     overrides.galleryAsset || (mocks.galleryAsset as As<GalleryAssetRepository>),
+    overrides.galleryPerson || (mocks.galleryPerson as As<GalleryPersonRepository>),
   );
 
   return {

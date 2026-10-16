@@ -10,6 +10,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
@@ -180,6 +181,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   StorageUsageRepository,
   GalleryDuplicateRepository,
   GalleryAssetRepository,
+  GalleryPersonRepository,
 ] as const;
 
 @Injectable()
@@ -269,6 +271,7 @@ export class BaseService {
     protected storageUsageRepository: StorageUsageRepository,
     protected galleryDuplicateRepository: GalleryDuplicateRepository,
     protected galleryAssetRepository: GalleryAssetRepository,
+    protected galleryPersonRepository: GalleryPersonRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -287,6 +290,7 @@ export class BaseService {
       jobRepository,
       logger: this.logger,
       personRepository,
+      galleryPersonRepository,
       sharedSpaceRepository,
     });
     this.faceAssignmentService = new FaceAssignmentService({
@@ -386,6 +390,7 @@ export class BaseService {
       ctx.storageUsageRepository,
       ctx.galleryDuplicateRepository,
       ctx.galleryAssetRepository,
+      ctx.galleryPersonRepository,
     );
 
     service.logger.setContext(BaseService.name);

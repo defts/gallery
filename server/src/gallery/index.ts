@@ -13,6 +13,7 @@ import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repos
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
 import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GalleryDuplicateRepository } from 'src/gallery/repositories/gallery-duplicate.repository.js';
+import { GalleryPersonRepository } from 'src/gallery/repositories/gallery-person.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
@@ -90,6 +91,7 @@ export const galleryRepositories = [
   StorageUsageRepository,
   GalleryDuplicateRepository,
   GalleryAssetRepository,
+  GalleryPersonRepository,
 ];
 
 export const galleryServices = [
