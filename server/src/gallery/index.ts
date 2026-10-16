@@ -22,6 +22,7 @@ import { AssetVisibilityTransitionService } from 'src/gallery/services/asset-vis
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
@@ -102,4 +103,5 @@ export const galleryServices = [
   StorageMigrationService,
   StorageUsageService,
   UserGroupService,
+  RuleMemoryService,
 ];
