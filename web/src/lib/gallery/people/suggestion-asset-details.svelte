@@ -1,8 +1,9 @@
 <script lang="ts">
   import { dateFormats } from '$lib/constants';
-  import { faceSuggestionContextExpanded as expanded } from '$lib/stores/face-suggestion-context.store';
+  import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
+  import { faceSuggestionContextExpanded as expanded } from '$lib/gallery/people/face-suggestion-context.store';
+  import { getSuggestionAssetHref } from '$lib/gallery/people/suggestion-asset-href';
   import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
-  import { Route } from '$lib/route';
   import { getDimensions } from '$lib/utils/asset-utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
@@ -39,10 +40,7 @@
     return parsed.isValid ? parsed.toLocaleString(dateFormats.album) : null;
   });
 
-  // A space viewer may be able to reach this asset ONLY through the space: /photos/{id} enforces the owner's
-  // AssetView and would 403 for them. Route has no space-asset helper (it is an upstream module this fork
-  // does not edit), so the space form is built here.
-  const openHref = $derived(spaceId ? `/spaces/${spaceId}/photos/${assetId}` : Route.viewAsset({ id: assetId }));
+  const openHref = $derived(getSuggestionAssetHref(assetId, spaceId));
 
   let asset = $state<AssetResponseDto | undefined>();
   let albums = $state<AlbumResponseDto[]>([]);
@@ -162,6 +160,7 @@
   >
     {$t('details')}
     <span class="text-xs" aria-hidden="true">{$expanded ? '▴' : '▾'}</span>
+    <ShortcutKeycap key="m" class="ms-1" />
   </button>
 
   <span class="grow"></span>
@@ -169,13 +168,14 @@
   <!-- A new tab, deliberately: the review queue, its position and the append-only `items` buffer all survive
        the trip, which is exactly what the right-click-open workaround in #1039 was preserving by hand. -->
   <a
-    class="shrink-0 font-medium text-primary hover:underline"
+    class="flex shrink-0 items-center gap-1.5 font-medium text-primary hover:underline"
     href={openHref}
     target="_blank"
     rel="noopener noreferrer"
     data-testid="suggestion-context-open"
   >
     {$t('face_suggestion_open_photo')}
+    <ShortcutKeycap key="o" />
   </a>
 </div>
 
@@ -261,7 +261,13 @@
               class="flex items-center gap-1.5 rounded-full border border-gray-200 py-0.5 pr-2.5 pl-0.5 text-xs dark:border-gray-700"
               data-testid="suggestion-context-person"
             >
-              <img class="size-5 rounded-full object-cover" src={getGlobalPersonThumbnailUrl(person)} alt="" />
+              <!-- `spaceId` as the Info panel passes it (getRepresentativeThumbnailUrl): inside a Space the
+                   asset's people carry a `spacePersonId`, whose face is the space profile's, not the owner's. -->
+              <img
+                class="size-5 rounded-full object-cover"
+                src={getGlobalPersonThumbnailUrl(person, { spaceId })}
+                alt=""
+              />
               {person.name}
             </span>
           {/each}

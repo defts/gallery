@@ -4,8 +4,8 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import SuggestionAssetDetails from '$lib/components/faces-page/suggestion-asset-details.svelte';
-import { faceSuggestionContextExpanded as expanded } from '$lib/stores/face-suggestion-context.store';
+import { faceSuggestionContextExpanded as expanded } from '$lib/gallery/people/face-suggestion-context.store';
+import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
 import { assetFactory } from '@test-data/factories/asset-factory';
 
 vi.mock('svelte-i18n', () => ({
@@ -140,6 +140,22 @@ describe('suggestion-asset-details — the collapsible block', () => {
     await expand();
 
     expect(getAssetMock).toHaveBeenCalledWith({ id: ASSET_ID, spaceId: SPACE_ID });
+  });
+
+  // Asset detail read through a space resolves each face to the space's person and says so with `spacePersonId`;
+  // that profile's face lives behind the space thumbnail route, as the Info panel renders it.
+  it('shows a space person with the space profile’s face', async () => {
+    getAssetMock.mockResolvedValueOnce(
+      loadedAsset({ people: [{ ...person('Alice'), spacePersonId: 'space-alice' } as PersonResponseDto] }),
+    );
+    render(SuggestionAssetDetails, {
+      props: { assetId: ASSET_ID, fileCreatedAt: '2015-08-12T14:32:00.000Z', spaceId: SPACE_ID },
+    });
+
+    await expand();
+
+    const avatar = within(await screen.findByTestId('suggestion-context-person')).getByRole('presentation');
+    expect(avatar.getAttribute('src')).toContain(`/shared-spaces/${SPACE_ID}/people/space-alice/thumbnail`);
   });
 
   it('does not re-request the asset when collapsed and expanded again', async () => {

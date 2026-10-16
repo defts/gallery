@@ -648,6 +648,7 @@
   "face_suggestion_review": "Überprüfen",
   "face_suggestion_reviewed": "Überprüft",
   "face_suggestion_same": "Gleiche Person",
+  "face_suggestion_toggle_details": "Fotodetails ein- oder ausblenden",
   "face_suggestion_unnamed_faces": "{count, plural, one {# unbenanntes Gesicht} other {# unbenannte Gesichter}}",
   "faces": "Gesichter",
   "faces_count": "{count, plural, one {# Gesicht} other {# Gesichter}}",

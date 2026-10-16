@@ -647,6 +647,7 @@
   "face_suggestion_review": "Review",
   "face_suggestion_reviewed": "Reviewed",
   "face_suggestion_same": "Same person",
+  "face_suggestion_toggle_details": "Show or hide photo details",
   "face_suggestion_unnamed_faces": "{count, plural, one {# unnamed face} other {# unnamed faces}}",
   "faces": "faces",
   "faces_count": "{count, plural, one {# face} other {# faces}}",

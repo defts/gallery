@@ -646,6 +646,7 @@
   "face_suggestion_review": "Esamina",
   "face_suggestion_reviewed": "Esaminato",
   "face_suggestion_same": "Stessa persona",
+  "face_suggestion_toggle_details": "Mostra o nascondi i dettagli della foto",
   "face_suggestion_unnamed_faces": "{count, plural, one {# volto senza nome} other {# volti senza nome}}",
   "faces": "volti",
   "faces_count": "{count, plural, one {# volto} other {# volti}}",

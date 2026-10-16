@@ -659,6 +659,7 @@
   "face_suggestion_review": "審查",
   "face_suggestion_reviewed": "已審查",
   "face_suggestion_same": "同一個人",
+  "face_suggestion_toggle_details": "顯示或隱藏照片詳細資訊",
   "face_suggestion_unnamed_faces": "{count, plural, one {# 張未命名臉孔} other {# 張未命名臉孔}}",
   "faces": "臉孔",
   "faces_count": "{count, plural, one {# 張臉孔} other {# 張臉孔}}",

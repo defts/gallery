@@ -646,6 +646,7 @@
   "face_suggestion_review": "Revisar",
   "face_suggestion_reviewed": "Revisada",
   "face_suggestion_same": "La misma persona",
+  "face_suggestion_toggle_details": "Mostrar u ocultar los detalles de la foto",
   "face_suggestion_unnamed_faces": "{count, plural, one {# cara sin nombre} other {# caras sin nombre}}",
   "faces": "caras",
   "faces_count": "{count, plural, one {# cara} other {# caras}}",

@@ -1,10 +1,13 @@
 import type { PersonFaceSuggestionPageResponseDto, PersonResponseDto } from '@immich/sdk';
-import { toastManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
 import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
+import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { reactivePageMock } from '@test-data/mocks/reactive-page.mock.svelte';
 
@@ -28,6 +31,7 @@ vi.mock('@immich/ui', async (importOriginal: () => Promise<typeof import('@immic
       primary: vi.fn(),
       danger: vi.fn(),
     },
+    modalManager: { ...actual.modalManager, show: vi.fn() },
   };
 });
 
@@ -208,24 +212,110 @@ describe('PersonSuggestionReviewModal', () => {
     expect(dismiss).not.toHaveBeenCalled();
   });
 
-  it('keyboard: ArrowRight confirms, ArrowLeft dismisses, ArrowDown ignores', async () => {
+  // #1079: letters judge, arrows move — the arrows used to be verdicts, which made "look at the next one" and
+  // "this is the same person" the same reach.
+  it('keyboard: s confirms, d dismisses, i ignores', async () => {
     const confirm = vi.fn().mockResolvedValue(acted());
     const dismiss = vi.fn().mockResolvedValue(acted());
     const ignore = vi.fn().mockResolvedValue(acted());
-    setup({ confirm, dismiss, ignore });
+    setup({
+      confirm,
+      dismiss,
+      ignore,
+      loadPage: vi.fn().mockResolvedValue({ total: 3, items: [item('f1'), item('f2'), item('f3')] }),
+    });
     await waitFor(() => screen.getByTestId('suggestion-same-btn'));
-    await userEvent.keyboard('{ArrowRight}'); // f1 → confirm
+    await userEvent.keyboard('s'); // f1 → confirm
     expect(confirm).toHaveBeenCalledWith('f1');
-    await userEvent.keyboard('{ArrowDown}'); // f2 → ignore
-    expect(ignore).toHaveBeenCalledWith('f2');
+    await userEvent.keyboard('d'); // f2 → dismiss
+    expect(dismiss).toHaveBeenCalledWith('f2');
+    await userEvent.keyboard('i'); // f3 → ignore
+    expect(ignore).toHaveBeenCalledWith('f3');
   });
 
-  it('keyboard: ArrowLeft dismisses', async () => {
+  it('keyboard: arrows move through the queue without judging', async () => {
+    const confirm = vi.fn().mockResolvedValue(acted());
     const dismiss = vi.fn().mockResolvedValue(acted());
-    setup({ dismiss });
-    await waitFor(() => screen.getByTestId('suggestion-different-btn'));
-    await userEvent.keyboard('{ArrowLeft}'); // f1 → dismiss
-    expect(dismiss).toHaveBeenCalledWith('f1');
+    setup({ confirm, dismiss });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(screen.getByTestId('suggestion-progress')).toHaveAttribute('data-current', '2'));
+    await userEvent.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(screen.getByTestId('suggestion-progress')).toHaveAttribute('data-current', '1'));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+
+  it('keyboard: modified letters are left to the browser', async () => {
+    const confirm = vi.fn().mockResolvedValue(acted());
+    setup({ confirm });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('{Meta>}s{/Meta}{Control>}s{/Control}');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('keyboard: m toggles the photo details', async () => {
+    faceSuggestionContextExpanded.set(false);
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('m');
+    expect(get(faceSuggestionContextExpanded)).toBe(true);
+    await userEvent.keyboard('m');
+    expect(get(faceSuggestionContextExpanded)).toBe(false);
+  });
+
+  it('keyboard: o opens the current photo in a new tab, through the space when in one', async () => {
+    reactivePageMock.reset('https://gallery.test/spaces/s1/people/p1', { params: { spaceId: 's1' } });
+    const open = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    await userEvent.keyboard('o');
+    expect(open).toHaveBeenCalledWith('/spaces/s1/photos/asset-f1', '_blank', 'noopener');
+    open.mockRestore();
+  });
+
+  it('shows each verdict’s key on its button', async () => {
+    setup();
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+    expect(screen.getByTestId('suggestion-same-btn')).toHaveTextContent(/s$/);
+    expect(screen.getByTestId('suggestion-different-btn')).toHaveTextContent(/d$/);
+    expect(screen.getByTestId('suggestion-ignore-btn')).toHaveTextContent(/i$/);
+  });
+
+  it('? lists the shortcuts, and the verdict keys pause while that list covers the face', async () => {
+    let closeOverlay!: () => void;
+    vi.mocked(modalManager.show).mockImplementation(
+      // `show` is typed by the modal it opens; ShortcutsModal closes with no result, so `never` is honest here.
+      () => new Promise<never>((resolve) => (closeOverlay = () => resolve(undefined as never))),
+    );
+    const confirm = vi.fn().mockResolvedValue(acted());
+    setup({ confirm });
+    await waitFor(() => screen.getByTestId('suggestion-same-btn'));
+
+    await userEvent.keyboard('{Shift>}?{/Shift}'); // what a real keyboard sends
+    expect(modalManager.show).toHaveBeenCalledWith(
+      ShortcutsModal,
+      expect.objectContaining({
+        shortcuts: expect.objectContaining({
+          actions: [
+            { key: ['s'], action: 'face_suggestion_same' },
+            { key: ['d'], action: 'face_suggestion_different' },
+            { key: ['i'], action: 'face_suggestion_ignore' },
+          ],
+        }),
+      }),
+    );
+
+    await userEvent.keyboard('s');
+    expect(confirm).not.toHaveBeenCalled();
+
+    closeOverlay();
+    await new Promise((resolve) => setTimeout(resolve, 0)); // let showShortcuts' `finally` run
+    await userEvent.keyboard('s');
+    expect(confirm).toHaveBeenCalledWith('f1');
+    vi.mocked(modalManager.show).mockReset();
   });
 
   // S11.1/F24: the modal must stop inferring "already resolved" from a status code that ALSO means "you're
@@ -494,7 +584,7 @@ describe('PersonSuggestionReviewModal', () => {
 
     // Bypass the disabled DOM attribute entirely — this exercises act()'s own internal guard, not just the
     // button's `disabled`.
-    await userEvent.keyboard('{ArrowRight}');
+    await userEvent.keyboard('s');
     expect(confirm).toHaveBeenCalledTimes(1); // still just the original confirm, no re-invocation
   });
 

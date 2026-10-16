@@ -661,6 +661,7 @@
   "face_suggestion_review": "审查",
   "face_suggestion_reviewed": "已审查",
   "face_suggestion_same": "同一个人",
+  "face_suggestion_toggle_details": "显示或隐藏照片详情",
   "face_suggestion_unnamed_faces": "{count, plural, one {# 张未命名人脸} other {# 张未命名人脸}}",
   "faces": "人脸",
   "faces_count": "{count, plural, one {# 张人脸} other {# 张人脸}}",

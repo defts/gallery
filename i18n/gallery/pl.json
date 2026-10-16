@@ -646,6 +646,7 @@
   "face_suggestion_review": "Przejrzyj",
   "face_suggestion_reviewed": "Przejrzano",
   "face_suggestion_same": "Ta sama osoba",
+  "face_suggestion_toggle_details": "Pokaż lub ukryj szczegóły zdjęcia",
   "face_suggestion_unnamed_faces": "{count, plural, one {# nienazwana twarz} few {# nienazwane twarze} many {# nienazwanych twarzy} other {# nienazwanej twarzy}}",
   "faces": "twarze",
   "faces_count": "{count, plural, one {# twarz} few {# twarze} many {# twarzy} other {# twarzy}}",

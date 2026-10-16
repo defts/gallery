@@ -646,6 +646,7 @@
   "face_suggestion_review": "Проверить",
   "face_suggestion_reviewed": "Проверено",
   "face_suggestion_same": "Тот же человек",
+  "face_suggestion_toggle_details": "Показать или скрыть подробности фото",
   "face_suggestion_unnamed_faces": "{count, plural, one {# безымянное лицо} few {# безымянных лица} many {# безымянных лиц} other {# безымянных лица}}",
   "faces": "лица",
   "faces_count": "{count, plural, one {# лицо} few {# лица} many {# лиц} other {# лица}}",

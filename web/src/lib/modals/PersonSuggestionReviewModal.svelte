@@ -1,7 +1,12 @@
 <script lang="ts">
   import { page } from '$app/state';
   import FaceCrop from '$lib/components/faces-page/face-crop.svelte';
-  import SuggestionAssetDetails from '$lib/components/faces-page/suggestion-asset-details.svelte';
+  import { shortcuts } from '$lib/actions/shortcut';
+  import ShortcutKeycap from '$lib/gallery/components/shortcut-keycap.svelte';
+  import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
+  import SuggestionAssetDetails from '$lib/gallery/people/suggestion-asset-details.svelte';
+  import { getSuggestionAssetHref } from '$lib/gallery/people/suggestion-asset-href';
+  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
   import { getContentMetrics } from '$lib/utils/container-utils';
   import { handleError } from '$lib/utils/handle-error';
@@ -13,13 +18,14 @@
     type PersonFaceSuggestionResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
-  import { Button, IconButton, Modal, ModalBody, ModalFooter, toastManager } from '@immich/ui';
+  import { Button, IconButton, Modal, ModalBody, ModalFooter, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountCheckOutline,
     mdiAccountRemoveOutline,
     mdiChevronLeft,
     mdiChevronRight,
     mdiEyeOffOutline,
+    mdiKeyboardOutline,
   } from '@mdi/js';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
@@ -207,39 +213,56 @@
     imgReady = false;
   });
 
-  function onKeydown(event: KeyboardEvent) {
-    if (loading) {
-      return;
+  // #1079: one list drives both the bindings below and the `?` overlay, so the two cannot drift apart. Letters
+  // for the verdicts (mnemonic, and one hand stays on them), arrows for moving through the queue, as in the asset
+  // viewer and the duplicates page.
+  const reviewShortcuts = $derived({
+    general: [
+      { key: ['←', '→'], action: $t('previous_or_next_photo') },
+      { key: ['m'], action: $t('face_suggestion_toggle_details') },
+      { key: ['o'], action: $t('face_suggestion_open_photo') },
+      { key: ['Esc'], action: $t('close') },
+    ],
+    actions: [
+      { key: ['s'], action: $t('face_suggestion_same') },
+      { key: ['d'], action: $t('face_suggestion_different') },
+      { key: ['i'], action: $t('face_suggestion_ignore') },
+    ],
+  });
+
+  // The overlay is a modal over this modal; while it is up, `s`/`d`/`i` must not judge the face hidden behind it.
+  let shortcutsOpen = $state(false);
+
+  async function showShortcuts() {
+    shortcutsOpen = true;
+    try {
+      await modalManager.show(ShortcutsModal, { shortcuts: reviewShortcuts });
+    } finally {
+      shortcutsOpen = false;
     }
-    switch (event.key) {
-      case 'ArrowRight': {
-        event.preventDefault();
-        void act('confirm');
-        break;
-      }
-      case 'ArrowLeft': {
-        event.preventDefault();
-        void act('dismiss');
-        break;
-      }
-      case 'ArrowDown': {
-        event.preventDefault();
-        void act('ignore');
-        break;
-      }
-      case ']': {
-        step(1);
-        break;
-      }
-      case '[': {
-        step(-1);
-        break;
-      }
+  }
+
+  function openPhoto() {
+    if (current) {
+      window.open(getSuggestionAssetHref(current.assetId, page.params.spaceId), '_blank', 'noopener');
     }
   }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:document
+  use:shortcuts={loading || shortcutsOpen
+    ? []
+    : [
+        { shortcut: { key: 's' }, onShortcut: () => void act('confirm') },
+        { shortcut: { key: 'd' }, onShortcut: () => void act('dismiss') },
+        { shortcut: { key: 'i' }, onShortcut: () => void act('ignore') },
+        { shortcut: { key: 'ArrowRight' }, onShortcut: () => step(1) },
+        { shortcut: { key: 'ArrowLeft' }, onShortcut: () => step(-1) },
+        { shortcut: { key: 'm' }, onShortcut: () => faceSuggestionContextExpanded.update((open) => !open) },
+        { shortcut: { key: 'o' }, onShortcut: openPhoto },
+        { shortcut: { key: '?', shift: true }, onShortcut: () => void showShortcuts() },
+      ]}
+/>
 
 <Modal
   title={person.name
@@ -254,15 +277,30 @@
         <div data-testid="suggestion-loading" class="h-96 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800"></div>
       {:else if current}
         <div class="flex flex-col gap-4">
-          <p
-            data-testid="suggestion-progress"
-            data-current={index + 1}
-            data-total={displayTotal}
-            aria-live="polite"
-            class="text-center text-sm text-gray-500 dark:text-gray-400"
-          >
-            {$t('face_suggestion_progress', { values: { current: index + 1, total: displayTotal } })}
-          </p>
+          <div class="relative flex items-center justify-center">
+            <p
+              data-testid="suggestion-progress"
+              data-current={index + 1}
+              data-total={displayTotal}
+              aria-live="polite"
+              class="text-center text-sm text-gray-500 dark:text-gray-400"
+            >
+              {$t('face_suggestion_progress', { values: { current: index + 1, total: displayTotal } })}
+            </p>
+            <!-- Touch-only devices have no keyboard to use the list on. -->
+            <IconButton
+              class="absolute inset-e-0 hidden pointer-fine:flex"
+              variant="ghost"
+              shape="round"
+              size="small"
+              color="secondary"
+              icon={mdiKeyboardOutline}
+              aria-label={$t('show_keyboard_shortcuts')}
+              title={$t('show_keyboard_shortcuts')}
+              data-testid="suggestion-shortcuts-btn"
+              onclick={() => void showShortcuts()}
+            />
+          </div>
 
           {#if currentActed}
             <p
@@ -371,7 +409,7 @@
         class="flex min-w-0 grow flex-col gap-2 sm:grow-0 sm:flex-row sm:justify-center sm:gap-3"
       >
         <Button
-          class="w-full sm:w-auto"
+          class="w-full sm:w-auto md:whitespace-nowrap"
           shape="round"
           color="secondary"
           disabled={busy || !current || currentActed}
@@ -380,9 +418,10 @@
           onclick={() => act('dismiss')}
         >
           {$t('face_suggestion_different')}
+          <ShortcutKeycap key="d" class="ms-1" />
         </Button>
         <Button
-          class="w-full sm:w-auto"
+          class="w-full sm:w-auto md:whitespace-nowrap"
           shape="round"
           color="secondary"
           disabled={busy || !current || currentActed}
@@ -391,9 +430,10 @@
           onclick={() => act('ignore')}
         >
           {$t('face_suggestion_ignore')}
+          <ShortcutKeycap key="i" class="ms-1" />
         </Button>
         <Button
-          class="w-full sm:w-auto"
+          class="w-full sm:w-auto md:whitespace-nowrap"
           shape="round"
           disabled={busy || !current || currentActed}
           leadingIcon={mdiAccountCheckOutline}
@@ -401,6 +441,7 @@
           onclick={() => act('confirm')}
         >
           {$t('face_suggestion_same')}
+          <ShortcutKeycap key="s" class="ms-1" />
         </Button>
       </div>
       <IconButton
