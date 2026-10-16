@@ -14,6 +14,7 @@ import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.
 import { QueueMaintenanceRepository } from 'src/gallery/repositories/queue-maintenance.repository.js';
 import { SmartFacetRepository } from 'src/gallery/repositories/smart-facet.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { StorageUsageRepository } from 'src/gallery/repositories/storage-usage.repository.js';
 import { VideoTrimRepository } from 'src/gallery/repositories/video-trim.repository.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
@@ -174,6 +175,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   FaceSearchRepository,
   GallerySyncRepository,
   VideoTrimRepository,
+  StorageUsageRepository,
 ] as const;
 
 @Injectable()
@@ -260,6 +262,7 @@ export class BaseService {
     protected faceSearchRepository: FaceSearchRepository,
     protected gallerySyncRepository: GallerySyncRepository,
     protected videoTrimRepository: VideoTrimRepository,
+    protected storageUsageRepository: StorageUsageRepository,
   ) {
     this.logger.setContext(this.constructor.name);
     this.storageCore = StorageCore.create(
@@ -374,6 +377,7 @@ export class BaseService {
       ctx.faceSearchRepository,
       ctx.gallerySyncRepository,
       ctx.videoTrimRepository,
+      ctx.storageUsageRepository,
     );
 
     service.logger.setContext(BaseService.name);
@@ -462,10 +466,10 @@ export class BaseService {
       const usage = await computePhysicalUsage({
         user,
         assetRepository: this.assetRepository,
-        storageRepository: this.storageRepository,
+        storageUsageRepository: this.storageUsageRepository,
         s3,
       });
-      await this.userRepository.setUsage(user.id, usage);
+      await this.storageUsageRepository.setUsage(user.id, usage);
     }
   }
 

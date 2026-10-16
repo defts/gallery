@@ -156,6 +156,7 @@ features:
       - server/src/backends/s3-storage.backend.ts
       - server/src/gallery/services/storage-usage.service*.ts
       - server/src/gallery/utils/storage-usage*.ts
+      - server/src/gallery/repositories/storage-usage.repository*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts
