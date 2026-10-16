@@ -34,6 +34,7 @@ import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
 import { RuleMemoryService } from 'src/gallery/services/rule-memory.service.js';
 import { StorageUsageService } from 'src/gallery/services/storage-usage.service.js';
+import { VideoTrimService } from 'src/gallery/services/video-trim.service.js';
 import { AppMetricsRepository } from 'src/repositories/app-metrics.repository.js';
 import { AssetFavoriteRepository } from 'src/repositories/asset-favorite.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
@@ -125,6 +126,7 @@ export const galleryServices = [
   StorageUsageService,
   UserGroupService,
   RuleMemoryService,
+  VideoTrimService,
 ];
 
 // Providers that are not plain classes, so they cannot sit in the lists above (telemetry, sync-sql, the queue and the
