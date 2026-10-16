@@ -241,7 +241,7 @@
 
 {#if assetInteraction.selectionActive}
   <AssetSelectControlBar>
-    {@const Actions = getAssetBulkActions($t, { restrictToSpaceId, editableSelectedAssetIds })}
+    {@const Actions = getAssetBulkActions($t, undefined, { restrictToSpaceId, editableSelectedAssetIds })}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
     {#if caps.canShare}
       <CreateSharedLink spaceId={shareSpaceId} />
