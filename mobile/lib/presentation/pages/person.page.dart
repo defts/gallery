@@ -19,7 +19,6 @@ class PersonPage extends ConsumerStatefulWidget {
 
   const PersonPage({super.key, required this.person});
 
-  // ignore: unused-code
   static const timelineOverviewControlsEnabled = true;
 
   @override

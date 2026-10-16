@@ -281,7 +281,6 @@ features:
       - mobile/lib/presentation/widgets/filter_sheet/**
       - mobile/lib/providers/gallery_nav/**
       - mobile/lib/presentation/widgets/gallery_nav/**
-      - mobile/ios/Runner/Info.plist
       - branding/**
       - design/gallery-*
       - web/static/gallery-*
