@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/utils/geo_uri.dart';
+import 'package:immich_mobile/gallery/utils/geo_uri.dart';
 
 void main() {
   group('buildAndroidGeoUri', () {
