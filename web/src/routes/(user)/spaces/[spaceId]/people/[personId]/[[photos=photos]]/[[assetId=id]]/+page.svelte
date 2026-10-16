@@ -30,7 +30,7 @@
   import { getSpacePersonFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { toScopedPersonRef as toPersonScopedRef } from '$lib/utils/scoped-person-ref';
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
-  import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
+  import { getTimelineTopVisibleAnchor } from '$lib/gallery/timeline/timeline-anchor';
   import {
     confirmSpacePersonFaceSuggestion,
     detachScopedPerson,
