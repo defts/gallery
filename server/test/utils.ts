@@ -15,6 +15,7 @@ import { PNG } from 'pngjs';
 import { Mock, Mocked, assert, vitest } from 'vitest';
 import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
+import { GalleryMachineLearningRepository } from 'src/gallery/repositories/gallery-machine-learning.repository.js';
 import { AssetUploadInterceptor } from 'src/middleware/asset-upload.interceptor.js';
 import { AuthGuard } from 'src/middleware/auth.guard.js';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor.js';
@@ -352,7 +353,7 @@ export const getMocks = () => {
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
     library: automock(LibraryRepository, { strict: false }),
-    machineLearning: automock(MachineLearningRepository, { args: [loggerMock], strict: false }),
+    machineLearning: automock(GalleryMachineLearningRepository, { args: [loggerMock], strict: false }),
     map: automock(MapRepository, { args: [undefined, undefined, { setContext: () => {} }] }),
     media: newMediaRepositoryMock(),
     memory: automock(MemoryRepository),
