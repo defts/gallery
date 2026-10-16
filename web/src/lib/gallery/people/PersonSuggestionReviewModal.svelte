@@ -231,9 +231,9 @@
     ],
   });
 
-  // With Details open on a wide screen the panel sits BESIDE the photo, with the two face crops under it:
-  // stacked, Details pushed the crops (the comparison itself) below the fold. Below `lg` there is no width
-  // to spare, so it stays stacked and the body scrolls.
+  // With Details open on a wide screen the panel sits BESIDE the photo, and the photo shrinks so the two face
+  // crops still fit under it: stacked, Details pushed the crops (the comparison itself) below the fold. Below
+  // `lg` there is no width to spare, so it stays stacked and the body scrolls.
   const wide = new MediaQuery('min-width: 1024px');
   const beside = $derived($faceSuggestionContextExpanded && wide.current);
 
@@ -349,9 +349,9 @@
             The stacked footer costs ~100px on a phone; capping the context photo lower there keeps it, both
             face crops and the buttons on screen together, which is the whole comparison the user is making.
           -->
-            <!-- Beside the panel the photo is wider, so its height is capped against the window instead: the header,
-               counter, summary row and footer take about 20rem, and the rest is the photo's. -->
-            <div class={['relative mx-auto', beside ? 'max-h-[calc(100vh-20rem)]' : 'max-h-[40vh] sm:max-h-[60vh]']}>
+            <!-- Beside the panel the photo is capped against the window instead: the header, counter, summary
+               row, face crops and footer take about 29rem, and the rest is the photo's. -->
+            <div class={['relative mx-auto', beside ? 'max-h-[calc(100vh-29rem)]' : 'max-h-[40vh] sm:max-h-[60vh]']}>
               <img
                 bind:this={imgEl}
                 data-testid="suggestion-full-photo"
@@ -359,7 +359,7 @@
                 alt={$t('face_suggestion_candidate')}
                 class={[
                   'w-auto rounded-lg object-contain',
-                  beside ? 'max-h-[calc(100vh-20rem)]' : 'max-h-[40vh] sm:max-h-[60vh]',
+                  beside ? 'max-h-[calc(100vh-29rem)]' : 'max-h-[40vh] sm:max-h-[60vh]',
                 ]}
                 onload={() => (imgReady = true)}
               />
@@ -400,19 +400,14 @@
               spaceId={page.params.spaceId}
             />
 
-            {#if !beside}
-              {#if $faceSuggestionContextExpanded}
-                <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="-mt-2" />
-              {/if}
-              {@render faceComparison(current)}
+            {#if $faceSuggestionContextExpanded && !beside}
+              <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="-mt-2" />
             {/if}
+            {@render faceComparison(current)}
           </div>
 
           {#if beside}
-            <div class="flex flex-col gap-4">
-              <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="mt-0" />
-              {@render faceComparison(current)}
-            </div>
+            <SuggestionAssetDetails assetId={current.assetId} spaceId={page.params.spaceId} class="mt-0" />
           {/if}
         </div>
       {:else if allDone}

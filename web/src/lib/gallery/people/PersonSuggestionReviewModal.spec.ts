@@ -294,7 +294,8 @@ describe('PersonSuggestionReviewModal', () => {
   });
 
   // #1079 user feedback: with Details open, the stacked panel pushed the two face crops (the comparison
-  // itself) below the fold. A wide screen now puts the panel beside the photo, with the crops under it.
+  // itself) below the fold. A wide screen now puts the panel beside the photo, which shrinks to keep the crops
+  // under it in view.
   describe('Details layout', () => {
     afterEach(() => {
       vi.restoreAllMocks();
@@ -311,7 +312,7 @@ describe('PersonSuggestionReviewModal', () => {
       expect(getAssetMock).not.toHaveBeenCalled();
     });
 
-    it('open on a wide screen: the panel and the face crops sit in a column beside the photo', async () => {
+    it('open on a wide screen: the panel sits beside the photo, and the face crops stay under it', async () => {
       screenIsWide(true);
       faceSuggestionContextExpanded.set(true);
       setup();
@@ -321,8 +322,8 @@ describe('PersonSuggestionReviewModal', () => {
       expect(layout).toHaveAttribute('data-beside', 'true');
       const [photoColumn, sideColumn] = [...layout.children];
       expect(within(photoColumn as HTMLElement).getByTestId('suggestion-full-photo')).toBeInTheDocument();
-      expect(within(sideColumn as HTMLElement).getByTestId('suggestion-context-details')).toBeInTheDocument();
-      expect(within(sideColumn as HTMLElement).getByTestId('suggestion-reference')).toBeInTheDocument();
+      expect(within(photoColumn as HTMLElement).getByTestId('suggestion-reference')).toBeInTheDocument();
+      expect(sideColumn).toHaveAttribute('data-testid', 'suggestion-context-details');
       expect(screen.getAllByTestId('suggestion-reference')).toHaveLength(1);
     });
 
