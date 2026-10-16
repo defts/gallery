@@ -5,8 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import PersonSuggestionReviewModal from '$lib/gallery/people/PersonSuggestionReviewModal.svelte';
 import { faceSuggestionContextExpanded } from '$lib/gallery/people/face-suggestion-context.store';
-import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import { handleError } from '$lib/utils/handle-error';
 import { reactivePageMock } from '@test-data/mocks/reactive-page.mock.svelte';
