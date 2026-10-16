@@ -6,7 +6,7 @@ import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:immich_mobile/widgets/common/app_bar_dialog/server_update_notification.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../widget_tester_extensions.dart';
+import '../widget_tester_extensions.dart';
 
 class _MockServerInfoService extends Mock implements ServerInfoService {}
 
