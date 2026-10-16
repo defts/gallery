@@ -626,9 +626,14 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
   // ===============================================================================================
   describe('COVER (#1153)', () => {
     // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over the shared fixture (db, albumL)
-    const coverOf = async () =>
-      (await db.selectFrom('album').select('albumThumbnailAssetId').where('id', '=', albumL).executeTakeFirstOrThrow())
-        .albumThumbnailAssetId;
+    const coverOf = async () => {
+      const album = await db
+        .selectFrom('album')
+        .select('albumThumbnailAssetId')
+        .where('id', '=', albumL)
+        .executeTakeFirstOrThrow();
+      return album.albumThumbnailAssetId;
+    };
 
     // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over the shared fixture (sut, actors, spaceS, albumL)
     const contributeFresh = async () => {
