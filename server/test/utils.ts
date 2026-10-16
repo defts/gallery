@@ -17,6 +17,7 @@ import type { RepositoryInterface } from 'src/types.js';
 import { UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { FaceSearchRepository } from 'src/gallery/repositories/face-search.repository.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { GallerySyncRepository } from 'src/gallery/repositories/gallery-sync.repository.js';
 import { MemoryRuleAssetRepository } from 'src/gallery/repositories/memory-rule-asset.repository.js';
 import { PetFaceRepository } from 'src/gallery/repositories/pet-face.repository.js';
@@ -331,6 +332,7 @@ export type ServiceOverrides = {
   faceSearch: FaceSearchRepository;
   gallerySync: GallerySyncRepository;
   videoTrim: VideoTrimRepository;
+  galleryAsset: GalleryAssetRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -449,10 +451,13 @@ export const getMocks = () => {
     faceSearch: automock(FaceSearchRepository, { strict: false }),
     gallerySync: automock(GallerySyncRepository),
     videoTrim: automock(VideoTrimRepository, { strict: false }),
+    galleryAsset: automock(GalleryAssetRepository, { strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
   mocks.clusterGroup.create.mockResolvedValue(ClusterGroupFactory.create());
+  mocks.galleryAsset.getOwnedManifestAssets.mockResolvedValue([]);
+  mocks.galleryAsset.getExternalAssetIds.mockResolvedValue(new Set<string>());
 
   return mocks;
 };
@@ -540,6 +545,7 @@ export const newTestService = <T extends BaseService>(
     overrides.faceSearch || (mocks.faceSearch as As<FaceSearchRepository>),
     overrides.gallerySync || (mocks.gallerySync as As<GallerySyncRepository>),
     overrides.videoTrim || (mocks.videoTrim as As<VideoTrimRepository>),
+    overrides.galleryAsset || (mocks.galleryAsset as As<GalleryAssetRepository>),
   );
 
   return {

@@ -13,6 +13,7 @@ import { MetadataSearchDto, SearchSuggestionType } from 'src/dtos/search.dto.js'
 import { TimeBucketDto } from 'src/dtos/time-bucket.dto.js';
 import { AlbumUserRole, AssetStatus, AssetVisibility, MemoryType, SharedLinkType, TimeBucketSize } from 'src/enum.js';
 import { FilterSuggestionRepository } from 'src/gallery/repositories/filter-suggestion.repository.js';
+import { GalleryAssetRepository } from 'src/gallery/repositories/gallery-asset.repository.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
@@ -76,6 +77,7 @@ const seed = async () => {
       AssetEditRepository,
       AssetFavoriteRepository,
       AssetRepository,
+      GalleryAssetRepository,
       ConfigRepository,
       CryptoRepository,
       DatabaseRepository,

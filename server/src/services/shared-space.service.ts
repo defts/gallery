@@ -775,7 +775,7 @@ export class SharedSpaceService extends BaseService {
   ): Promise<number> {
     const callerId = auth.user.id;
     const scope = await this.resolveViewerScope(auth, 'timeline', { userId: callerId, withSharedSpaces: true }, db);
-    return this.assetRepository.getTimelineAssetCount(
+    return this.galleryAssetRepository.getTimelineAssetCount(
       {
         userIds: [callerId],
         callerId,
@@ -3443,7 +3443,7 @@ export class SharedSpaceService extends BaseService {
         break;
       }
 
-      const assets = await this.assetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
+      const assets = await this.galleryAssetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
       if (assets.length === 0) {
         break;
       }
@@ -3493,7 +3493,12 @@ export class SharedSpaceService extends BaseService {
         break;
       }
 
-      const assets = await this.assetRepository.getByAlbumIdWithFaces(job.albumId, job.spaceId, batchSize, offset);
+      const assets = await this.galleryAssetRepository.getByAlbumIdWithFaces(
+        job.albumId,
+        job.spaceId,
+        batchSize,
+        offset,
+      );
       if (assets.length === 0) {
         break;
       }
