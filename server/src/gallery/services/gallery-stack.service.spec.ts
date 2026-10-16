@@ -11,6 +11,7 @@ describe(GalleryStackService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(GalleryStackService));
+    mocks.stack.update.mockResolvedValue({} as never);
   });
 
   describe('onAssetsTrash (#1187)', () => {
