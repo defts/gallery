@@ -33275,7 +33275,8 @@
           "SharedSpaceIdentityReconciliationSweep",
           "AssetClassifyQueueAll",
           "AssetClassify",
-          "MemoryRuleGenerate"
+          "MemoryRuleGenerate",
+          "AssetVideoTrimGenerate"
         ],
         "type": "string"
       },
