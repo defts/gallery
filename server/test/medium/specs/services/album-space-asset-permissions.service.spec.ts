@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { AssetVisibility, JobName, Permission } from 'src/enum.js';
 import { SpaceAlbumRepository } from 'src/gallery/repositories/space-album.repository.js';
+import { GalleryAlbumService } from 'src/gallery/services/gallery-album.service.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
@@ -297,13 +298,26 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
   // ADD TARGETS — the picker's read-only view of the ADD rules above
   // ===============================================================================================
   describe('ADD TARGETS', () => {
+    // POST /albums/add-targets lives on the fork's GalleryAlbumService, over the same database.
+    const targets = {
+      getAddTargets: (...args: Parameters<GalleryAlbumService['getAddTargets']>) =>
+        newMediumService(GalleryAlbumService, {
+          database: db,
+          real: [AccessRepository, SharedSpaceRepository],
+          mock: [LoggingRepository],
+        }).sut.getAddTargets(...args),
+    };
+
     it('non-owned space photo: only the space-linked album is a target, and nothing is shareable', async () => {
       const { ctx } = setup();
       const { asset } = await ctx.newAsset({ ownerId: actors.carol.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: spaceS, assetId: asset.id, addedById: actors.carol.id });
       const { result: own } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal' });
 
-      const res = await sut.getAddTargets(authOf('spaceEditor'), { albumIds: [albumL, own.id], assetIds: [asset.id] });
+      const res = await targets.getAddTargets(authOf('spaceEditor'), {
+        albumIds: [albumL, own.id],
+        assetIds: [asset.id],
+      });
       expect(res).toEqual({ albums: [{ albumId: albumL, acceptedAssetCount: 1 }], shareableAssetCount: 0 });
     });
 
@@ -317,7 +331,7 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
         visibility: AssetVisibility.Timeline,
       });
 
-      const res = await sut.getAddTargets(authOf('spaceEditor'), { albumIds: [albumL], assetIds: [asset.id] });
+      const res = await targets.getAddTargets(authOf('spaceEditor'), { albumIds: [albumL], assetIds: [asset.id] });
       expect(res.albums).toEqual([{ albumId: albumL, acceptedAssetCount: 1 }]);
     });
 
@@ -331,7 +345,7 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
       });
       const { result: own } = await ctx.newAlbum({ ownerId: actors.spaceEditor.id, albumName: 'Personal' });
 
-      const res = await sut.getAddTargets(authOf('spaceEditor'), {
+      const res = await targets.getAddTargets(authOf('spaceEditor'), {
         albumIds: [albumL, own.id],
         assetIds: [theirs.id, mine.id],
       });
@@ -346,12 +360,12 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
     });
 
     it('space Viewer gets no targets for a non-owned photo (no AlbumAssetCreate on the linked album)', async () => {
-      const res = await sut.getAddTargets(authOf('spaceViewer'), { albumIds: [albumL], assetIds: [assetCarol] });
+      const res = await targets.getAddTargets(authOf('spaceViewer'), { albumIds: [albumL], assetIds: [assetCarol] });
       expect(res).toEqual({ albums: [], shareableAssetCount: 0 });
     });
 
     it('Hidden and other-space assets are not counted', async () => {
-      const res = await sut.getAddTargets(authOf('spaceEditor'), {
+      const res = await targets.getAddTargets(authOf('spaceEditor'), {
         albumIds: [albumL],
         assetIds: [assetHidden, assetOnlyInT],
       });
