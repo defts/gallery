@@ -11,7 +11,6 @@
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { globalSearchManager, type SearchMode } from '$lib/managers/global-search-manager.svelte';
-  import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import ServerRestartingModal from '$lib/modals/ServerRestartingModal.svelte';
   import { queryClient } from '$lib/queries/client';
   import { Route } from '$lib/route';
