@@ -14,6 +14,22 @@ This option only appears when the server is started with `IMMICH_STORAGE_BACKEND
 2. Turn on **Upload backups to S3**.
 3. Save.
 
+If you run Gallery from a [config file](/install/config-file), set it there instead — the Backup section is read-only in the web UI in that mode:
+
+```json
+{
+  "backup": {
+    "database": {
+      "s3": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+In config-file mode the server cannot refuse the setting at save time, because there is no save. If the file turns this on while `IMMICH_STORAGE_BACKEND` is not `s3`, the server logs a warning on the first backup and keeps writing backups to local disk.
+
 That is the whole setting. Backups go to the same bucket as your media, under `backups/` — the same folder name they use on disk, and one no media file can occupy, since media is written under `upload/`, `library/`, `thumbs/`, `encoded-video/` and `profile/`. If you want S3 lifecycle rules just for your backups, scope them to the `backups/` prefix.
 
 The next scheduled or manual backup is uploaded. From then on, **Administration > Settings > Backup Settings** and the restore picker list the backups in your bucket.

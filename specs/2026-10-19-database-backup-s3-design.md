@@ -194,6 +194,12 @@ than disabled when it cannot apply (`AuthSettings.svelte` is the in-repo precede
 config group). The switch is the entire control — there is nothing else to configure — and the existing
 `SettingButtonsRow keys={['backup']}` already covers saving.
 
+`IMMICH_CONFIG_FILE` sets the flag too, through the same schema — nothing extra was needed for that, and
+`galleryConfigBool` is what makes a quoted YAML boolean parse. In that mode the whole Backup section is read-only
+in the UI, and `ConfigValidate` never fires (it only runs from `updateSystemConfig`, which config-file mode
+refuses), so a file that enables S3 backups off the S3 backend reaches the resolver: it degrades to local-only
+with a warning, which is the only diagnosis available when there is no admin UI to show an error in.
+
 Server-side the `ConfigValidate` handler rejects a save that enables S3 backups while the storage backend is not
 S3, so the API cannot be used to reach a state the UI will not show. `DatabaseBackupService` holds the handler but
 delegates to `validateBackupS3Config` in the fork namespace, keeping the upstream file to one call into a fork

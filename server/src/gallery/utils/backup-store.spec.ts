@@ -12,6 +12,14 @@ import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, getMocks } from 'test/utils.js';
 
+/** Points the config source at an `IMMICH_CONFIG_FILE` holding `yaml`, on an S3 media backend. */
+const configFileOnS3 = (mocks: ServiceMocks, yaml: string) => {
+  mocks.config.getEnv.mockReturnValue(
+    mockEnvData({ configFile: '/data/config.yaml', storage: { backend: 's3', s3: { bucket: 'media' } as never } }),
+  );
+  mocks.systemMetadata.readFile.mockResolvedValue(yaml);
+};
+
 /** Overrides the one seam that would otherwise build a real S3 client. */
 class TestBackupStoreResolver extends BackupStoreResolver {
   readonly built: S3StorageConfig[] = [];
@@ -124,6 +132,62 @@ describe('BackupStoreResolver', () => {
       expect(store.remote?.bucket).toBe('media');
       // the same key on both backends, so a promote never rewrites it
       expect(store.key('immich-db-backup-1.sql.gz')).toBe('backups/immich-db-backup-1.sql.gz');
+    });
+  });
+
+  // IMMICH_CONFIG_FILE is the other way to set this, and the one an admin on the S3 backend is most
+  // likely to be using: the whole Backup section is read-only in the UI in that mode. The schema is
+  // shared with the database path, so what these pin is that the flag survives YAML (where a boolean may
+  // arrive as a string) and that the resolver reads it from there.
+  describe('from a config file', () => {
+    it('turns S3 backups on', async () => {
+      configFileOnS3(mocks, 'backup:\n  database:\n    s3:\n      enabled: true\n');
+
+      const store = await sut.resolve();
+
+      expect(store.remote?.bucket).toBe('media');
+    });
+
+    it('turns S3 backups off', async () => {
+      configFileOnS3(mocks, 'backup:\n  database:\n    s3:\n      enabled: false\n');
+
+      const store = await sut.resolve();
+
+      expect(store.remote).toBeUndefined();
+    });
+
+    it('leaves them off when the file says nothing about them', async () => {
+      configFileOnS3(mocks, 'backup:\n  database:\n    keepLastAmount: 7\n');
+
+      const store = await sut.resolve();
+
+      expect(store.remote).toBeUndefined();
+    });
+
+    // `galleryConfigBool` exists for this: a quoted YAML boolean must not be read as a truthy string.
+    it('coerces a quoted boolean', async () => {
+      configFileOnS3(mocks, `backup:\n  database:\n    s3:\n      enabled: 'true'\n`);
+      const on = await sut.resolve();
+      expect(on.remote).toBeDefined();
+
+      configFileOnS3(mocks, `backup:\n  database:\n    s3:\n      enabled: 'false'\n`);
+      const off = await sut.resolve();
+      expect(off.remote).toBeUndefined();
+    });
+
+    // The ConfigValidate guard only fires from updateSystemConfig, which config-file mode refuses
+    // outright, so this combination reaches the resolver. It must degrade rather than break backups —
+    // and say so, since there is no admin UI in this mode to diagnose it from.
+    it('degrades to local-only, with a warning, when the file enables it off the S3 backend', async () => {
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({ configFile: '/data/config.yaml', storage: { backend: 'disk' } }),
+      );
+      mocks.systemMetadata.readFile.mockResolvedValue('backup:\n  database:\n    s3:\n      enabled: true\n');
+
+      const store = await sut.resolve();
+
+      expect(store.remote).toBeUndefined();
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('storage backend is not S3'));
     });
   });
 
