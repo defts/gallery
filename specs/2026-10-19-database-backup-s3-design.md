@@ -166,7 +166,16 @@ New fork code is in `server/src/gallery/utils/backup-store.ts` and
 - `src/services/database-backup.service.ts` — the substantive edit, and the one upstream file whose diff against
   the tag grows materially. It is the price of the owner's decision: the alternative was leaving the service
   disk-only and bolting an uploader beside it.
+- `src/app.module.ts` — one provider line, because `MaintenanceModule` lists its providers explicitly rather than
+  spreading `services`. A spec in `backup-store.spec.ts` fails for any future non-optional dependency of
+  `DatabaseBackupService` that is missing there, since nothing else would catch it before the restore flow failed
+  to boot.
 - `web/src/routes/admin/system-settings/BackupSettings.svelte` — one `{#if}` group inside the existing section.
+
+Measured against the `v3.3.3` tag, the upstream files this touches go from +337/-9 to +691/-77 lines. Two of them
+were byte-identical to upstream before: `database-backup.service.ts` (now +254/-67) and `BackupSettings.svelte`
+(now +35/-1). The service is where the whole change lives, so that is the cost being paid; the rest are one or two
+lines each.
 
 No database migration, no new dependency (`@aws-sdk/client-s3`, `@aws-sdk/lib-storage` and
 `@aws-sdk/s3-request-presigner` are already server dependencies), and no fork table, so
