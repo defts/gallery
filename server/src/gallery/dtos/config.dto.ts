@@ -17,16 +17,15 @@ export const galleryConfigBool = z
   }, z.boolean())
   .meta({ type: 'boolean' });
 
-// Gallery-fork: scheduled database backups to S3. Deliberately three fields — region, endpoint and
-// credentials are NOT here, because the feature is only offered when the server's storage backend is
-// already S3 (IMMICH_STORAGE_BACKEND=s3), so the only credentials that could apply are the ones the
-// media backend is already using. That keeps secrets out of the database and out of GET /admin/config,
-// which redacts nothing today. A separate bucket is still worth allowing even though it defaults to the
-// media one: backups want their own lifecycle rules, retention and access policy.
+// Gallery-fork: scheduled database backups to S3. Deliberately just an on/off flag and a prefix. The
+// bucket, credentials, region and endpoint are NOT here, because the feature is only offered when the
+// server's storage backend is already S3 (IMMICH_STORAGE_BACKEND=s3), so the only S3 configuration that
+// could apply is the one the media backend is already using. That keeps secrets out of the database and
+// out of GET /admin/config, which redacts nothing today, and leaves the admin with the one choice that
+// is genuinely theirs: where in the bucket the dumps land.
 export const GalleryBackupS3Schema = z
   .object({
     enabled: galleryConfigBool.describe('Upload scheduled database backups to S3'),
-    bucket: z.string().describe('Bucket for database backups. Empty reuses the media bucket (IMMICH_S3_BUCKET).'),
     prefix: z.string().describe('Key prefix for database backup objects'),
   })
   .meta({ id: 'AdminConfigDatabaseBackupS3Dto' });
@@ -178,7 +177,7 @@ export const galleryMachineLearningDefaults = {
 
 export const galleryBackupDatabaseDefaults = {
   // off out of the box, so a fresh install behaves exactly like upstream Immich
-  s3: { enabled: false, bucket: '', prefix: 'immich-db-backups/' },
+  s3: { enabled: false, prefix: 'immich-db-backups/' },
 };
 
 export const galleryServerDefaults = { mergePeopleAcrossOwners: false };

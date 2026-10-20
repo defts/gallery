@@ -14,11 +14,11 @@ S3 → on success delete the local copy.
 
 The feature is offered only when the server's storage backend is already S3 (`IMMICH_STORAGE_BACKEND=s3`), with an
 enable/disable flag in Admin → System Settings → Backup that is absent otherwise. Because an S3 backend is already
-constructed and credentialed when it applies, the feature reuses the existing `IMMICH_S3_*` credentials, region and
-endpoint: no new environment variables, no secrets in the database, and nothing new that `GET /admin/config` would
-hand back in the clear (it redacts nothing today — `notifications.smtp.transport.password` and `oauth.clientSecret`
-both come back as stored). The admin is left with the three things that are genuinely a choice: on/off, which
-bucket, which prefix.
+constructed and credentialed when it applies, the feature reuses the existing `IMMICH_S3_*` bucket, credentials,
+region and endpoint: no new environment variables, no secrets in the database, and nothing new that
+`GET /admin/config` would hand back in the clear (it redacts nothing today —
+`notifications.smtp.transport.password` and `oauth.clientSecret` both come back as stored). The admin is left with
+the two things that are genuinely a choice: on/off, and where in the bucket the dumps land.
 
 ## Decisions
 
@@ -33,9 +33,16 @@ bucket, which prefix.
 - **Gated on the env storage backend being S3.** That gate is what keeps the feature small: it is the reason no
   credentials, region or endpoint belong in the saved config. Letting backups go to S3 while media stays on disk is
   out of scope, and lifting the gate is what would bring back a bucket/region/endpoint/credentials block of its own.
-- **Three config fields only:** `backup.database.s3 = { enabled, bucket, prefix }`. A separate bucket is worth
-  allowing even though it defaults to the media one: backups want their own lifecycle rules, retention and access
-  policy.
+- **Two config fields only:** `backup.database.s3 = { enabled, prefix }`. An earlier draft allowed a separate
+  bucket, on the grounds that backups want their own lifecycle rules and access policy. The owner removed it: the
+  gate already guarantees the server is credentialed for exactly one bucket, so a second bucket field is a way to
+  configure a destination the server cannot necessarily write to, and the failure would only surface at backup
+  time. Lifecycle rules can be scoped to the prefix instead.
+- **The prefix is therefore required and may not be empty.** It is the only thing separating dumps from the media
+  key space, and an empty prefix would also make every listing (retention, the backup list, restore) enumerate the
+  entire media bucket. `ConfigValidate` rejects a blank prefix while the flag is on, and the resolver independently
+  falls back to `DEFAULT_BACKUP_PREFIX` for any config that predates the guard or arrives through
+  `IMMICH_CONFIG_FILE`.
 - **Off by default** (`enabled: false`), so a fresh install behaves exactly like upstream Immich.
 - **Two independent key spaces.** The staging key is `backups/<filename>`, which `DiskStorageBackend` resolves under
   the media location; the remote key is `<prefix><filename>`. One shared key would have put the admin's prefix
@@ -77,10 +84,10 @@ and rebuilt when any of those change. It is a Nest provider (registered in `gall
 so the backup service can be given a stub and the client is owned by something with a lifecycle.
 
 **The gate.** `remote` is set only when all of: the env storage backend is `s3`, `backup.database.s3.enabled` is
-on, and a bucket is resolvable (`backup.database.s3.bucket`, else `IMMICH_S3_BUCKET`). The S3 backend is built from
-`envData.storage.s3` with only the bucket substituted. A failed gate degrades to local-only with a warning logged
-once per distinct misconfiguration, so an admin who sets `IMMICH_STORAGE_BACKEND` back to disk still gets backups
-instead of none.
+on, and `IMMICH_S3_BUCKET` is set. The S3 backend is built from `envData.storage.s3` verbatim — nothing about the
+destination comes from the saved config except the prefix. A failed gate degrades to local-only with a warning
+logged once per distinct misconfiguration, so an admin who sets `IMMICH_STORAGE_BACKEND` back to disk still gets
+backups instead of none.
 
 ## 2. What each operation became
 
@@ -149,7 +156,7 @@ config group). Bucket and prefix are additionally disabled while the toggle is o
 `SettingButtonsRow keys={['backup']}` already covers saving.
 
 Server-side the `ConfigValidate` handler rejects a save that enables S3 backups while the storage backend is not
-S3, so the API cannot be used to reach a state the UI will not show. `DatabaseBackupService` holds the handler but
+S3, or with a blank prefix, so the API cannot be used to reach a state the UI will not show. `DatabaseBackupService` holds the handler but
 delegates to `validateBackupS3Config` in the fork namespace, keeping the upstream file to one call into a fork
 module.
 

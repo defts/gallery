@@ -38,7 +38,7 @@ const listingUnder =
 
 const configWithS3 = (enabled: boolean) =>
   ({
-    backup: { database: { ...defaults.backup.database, s3: { enabled, bucket: '', prefix: '' } } },
+    backup: { database: { ...defaults.backup.database, s3: { enabled, prefix: 'immich-db-backups/' } } },
   }) as SystemConfig;
 
 describe(DatabaseBackupService.name, () => {

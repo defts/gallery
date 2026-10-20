@@ -69,15 +69,15 @@ describe('gallery config fragments', () => {
   });
 
   it('coerces the backup S3 enabled flag from an IMMICH_CONFIG_FILE string boolean', () => {
-    const parsed = GalleryBackupS3Schema.parse({ enabled: 'true', bucket: '', prefix: 'db/' });
+    const parsed = GalleryBackupS3Schema.parse({ enabled: 'true', prefix: 'db/' });
     expect(parsed.enabled).toBe(true);
   });
 
-  // Credentials, region and endpoint are deliberately absent: the feature is only offered on the S3
-  // storage backend, so the only ones that could apply are the media backend's. Keeping them out is
-  // what keeps secrets out of the database and out of GET /admin/config, which redacts nothing.
-  it('carries no credentials, region or endpoint', () => {
-    expect(Object.keys(GalleryBackupS3Schema.shape).toSorted()).toEqual(['bucket', 'enabled', 'prefix']);
+  // Bucket, credentials, region and endpoint are deliberately absent: the feature is only offered on
+  // the S3 storage backend, so the only ones that could apply are the media backend's. Keeping them out
+  // is what keeps secrets out of the database and out of GET /admin/config, which redacts nothing.
+  it('carries no bucket, credentials, region or endpoint', () => {
+    expect(Object.keys(GalleryBackupS3Schema.shape).toSorted()).toEqual(['enabled', 'prefix']);
   });
 });
 
@@ -107,7 +107,7 @@ describe('fork config survives schema composition', () => {
   });
 
   it('keeps the fork database-backup S3 block', () => {
-    expect(parsed.backup.database.s3).toEqual({ enabled: false, bucket: '', prefix: 'immich-db-backups/' });
+    expect(parsed.backup.database.s3).toEqual({ enabled: false, prefix: 'immich-db-backups/' });
   });
 
   it('keeps the fork server flag and job concurrencies', () => {

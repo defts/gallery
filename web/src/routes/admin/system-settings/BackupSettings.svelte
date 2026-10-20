@@ -89,15 +89,7 @@
 
           <SettingInputField
             inputType={SettingInputFieldType.TEXT}
-            label={$t('admin.backup_s3_bucket')}
-            description={$t('admin.backup_s3_bucket_description')}
-            disabled={disabled || !configToEdit.backup.database.s3.enabled}
-            bind:value={configToEdit.backup.database.s3.bucket}
-            isEdited={configToEdit.backup.database.s3.bucket !== config.backup.database.s3.bucket}
-          />
-
-          <SettingInputField
-            inputType={SettingInputFieldType.TEXT}
+            required={true}
             label={$t('admin.backup_s3_prefix')}
             description={$t('admin.backup_s3_prefix_description')}
             disabled={disabled || !configToEdit.backup.database.s3.enabled}

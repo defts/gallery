@@ -33,9 +33,18 @@ export interface BackupStore {
   };
 }
 
+/**
+ * Where dumps go when the admin leaves the prefix blank. Since the bucket is always the media bucket,
+ * an empty prefix would put dumps at its root and make every listing enumerate the whole media bucket,
+ * so the prefix is never allowed to be empty in practice.
+ */
+export const DEFAULT_BACKUP_PREFIX = 'immich-db-backups/';
+
 /** Trailing slash normalised so `<prefix><filename>` is always a well-formed key. */
 export const normalizeBackupPrefix = (prefix: string): string => {
-  const trimmed = prefix.replace(/^\/+/, '').trim();
+  // trim first, then strip leading slashes: the other order leaves a padded '  /db' as '/db/', and an
+  // S3 key starting with '/' creates an unnamed top-level folder rather than the one the admin typed
+  const trimmed = prefix.trim().replace(/^\/+/, '');
   if (!trimmed) {
     return '';
   }
@@ -49,10 +58,21 @@ export const normalizeBackupPrefix = (prefix: string): string => {
  * because the UI hides the whole group when the storage backend is not S3.
  */
 export const validateBackupS3Config = (newConfig: SystemConfig, env: { storage: { backend: 'disk' | 's3' } }): void => {
-  if (newConfig.backup.database.s3.enabled && env.storage.backend !== 's3') {
+  const { enabled, prefix } = newConfig.backup.database.s3;
+  if (!enabled) {
+    return;
+  }
+
+  if (env.storage.backend !== 's3') {
     throw new Error(
       'Database backups can only be uploaded to S3 while the server is running on the S3 storage backend. Set IMMICH_STORAGE_BACKEND=s3 first, or leave this off.',
     );
+  }
+
+  // Backups share the media bucket, so the prefix is the only thing keeping them out of the media key
+  // space. An empty one would also make every backup listing enumerate the entire bucket.
+  if (!normalizeBackupPrefix(prefix)) {
+    throw new Error('A key prefix is required for database backups to S3, so they stay separate from your media.');
   }
 };
 
@@ -111,17 +131,21 @@ export class BackupStoreResolver {
       return store;
     }
 
-    const bucket = s3Settings.bucket || env.storage.s3.bucket;
+    // The same bucket media is written to: the gate guarantees an S3 media backend, so this is the
+    // only bucket the server is credentialed for. `prefix` is what separates the dumps from the media.
+    const bucket = env.storage.s3.bucket;
     if (!bucket) {
       this.warnOnce(
         'no-bucket',
-        'Database backups are configured to upload to S3, but no bucket is set (neither in the backup settings nor IMMICH_S3_BUCKET). Keeping backups on local disk only.',
+        'Database backups are configured to upload to S3, but IMMICH_S3_BUCKET is not set. Keeping backups on local disk only.',
       );
       return store;
     }
 
-    const prefix = normalizeBackupPrefix(s3Settings.prefix);
-    const backendConfig: S3StorageConfig = { ...env.storage.s3, bucket };
+    // Defence in depth with the ConfigValidate guard above: a config written before that guard existed,
+    // or by an IMMICH_CONFIG_FILE that bypasses it, must still not target the bucket root.
+    const prefix = normalizeBackupPrefix(s3Settings.prefix) || DEFAULT_BACKUP_PREFIX;
+    const backendConfig: S3StorageConfig = env.storage.s3;
     store.remote = {
       backend: this.getRemoteBackend(backendConfig, prefix),
       bucket,

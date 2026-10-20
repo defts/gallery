@@ -27452,10 +27452,6 @@
       },
       "AdminConfigDatabaseBackupS3Dto": {
         "properties": {
-          "bucket": {
-            "description": "Bucket for database backups. Empty reuses the media bucket (IMMICH_S3_BUCKET).",
-            "type": "string"
-          },
           "enabled": {
             "description": "Upload scheduled database backups to S3",
             "type": "boolean"
@@ -27466,7 +27462,6 @@
           }
         },
         "required": [
-          "bucket",
           "prefix"
         ],
         "type": "object"

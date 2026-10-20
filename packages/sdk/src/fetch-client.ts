@@ -55,8 +55,6 @@ export type ActivityStatisticsResponseDto = {
     likes: number;
 };
 export type AdminConfigDatabaseBackupS3Dto = {
-    /** Bucket for database backups. Empty reuses the media bucket (IMMICH_S3_BUCKET). */
-    bucket: string;
     /** Upload scheduled database backups to S3 */
     enabled?: boolean;
     /** Key prefix for database backup objects */

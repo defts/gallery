@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleSystemConfigSave } from '$lib/services/system-config.service';
 import BackupSettings from './BackupSettings.svelte';
 
-const makeConfig = (s3: { enabled: boolean; bucket: string; prefix: string }) =>
+const makeConfig = (s3: { enabled: boolean; prefix: string }) =>
   ({
     backup: {
       database: {
@@ -64,8 +64,8 @@ describe('BackupSettings', () => {
     vi.clearAllMocks();
     mocks.featureFlags.configFile = false;
     mocks.featureFlags.s3Storage = false;
-    mocks.systemConfig = makeConfig({ enabled: false, bucket: '', prefix: 'immich-db-backups/' });
-    mocks.defaultSystemConfig = makeConfig({ enabled: false, bucket: '', prefix: 'immich-db-backups/' });
+    mocks.systemConfig = makeConfig({ enabled: false, prefix: 'immich-db-backups/' });
+    mocks.defaultSystemConfig = makeConfig({ enabled: false, prefix: 'immich-db-backups/' });
     mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
     mocks.cloneDefaultValue.mockImplementation(() => structuredClone(mocks.defaultSystemConfig));
   });
@@ -77,7 +77,6 @@ describe('BackupSettings', () => {
       const { container } = render(BackupSettings);
 
       expect(screen.queryByRole('switch', { name: 'admin.backup_s3_enabled' })).not.toBeInTheDocument();
-      expect(field(container, 'admin.backup_s3_bucket')).toBeNull();
       expect(field(container, 'admin.backup_s3_prefix')).toBeNull();
       expect(screen.queryByText('admin.backup_s3_credentials_hint')).not.toBeInTheDocument();
     });
@@ -95,29 +94,33 @@ describe('BackupSettings', () => {
       mocks.featureFlags.s3Storage = true;
     });
 
-    it('renders the toggle, the bucket and prefix fields, and the credentials hint', () => {
+    it('renders the toggle, the prefix field and the credentials hint', () => {
       const { container } = render(BackupSettings);
 
       expect(screen.getByRole('switch', { name: 'admin.backup_s3_enabled' })).not.toBeChecked();
-      expect(field(container, 'admin.backup_s3_bucket')).toBeInTheDocument();
       expect(field(container, 'admin.backup_s3_prefix')).toBeInTheDocument();
       expect(screen.getByText('admin.backup_s3_credentials_hint')).toBeInTheDocument();
     });
 
-    it('disables the bucket and prefix fields while the toggle is off', () => {
+    // There is no bucket field: backups share the media bucket, so the prefix is the only choice.
+    it('offers no bucket field', () => {
       const { container } = render(BackupSettings);
 
-      expect(field(container, 'admin.backup_s3_bucket')).toBeDisabled();
+      expect(field(container, 'admin.backup_s3_bucket')).toBeNull();
+    });
+
+    it('disables the prefix field while the toggle is off', () => {
+      const { container } = render(BackupSettings);
+
       expect(field(container, 'admin.backup_s3_prefix')).toBeDisabled();
     });
 
-    it('enables the bucket and prefix fields once the toggle is on', async () => {
+    it('enables the prefix field once the toggle is on', async () => {
       const user = userEvent.setup();
       const { container } = render(BackupSettings);
 
       await user.click(screen.getByRole('switch', { name: 'admin.backup_s3_enabled' }));
 
-      expect(field(container, 'admin.backup_s3_bucket')).toBeEnabled();
       expect(field(container, 'admin.backup_s3_prefix')).toBeEnabled();
     });
 
@@ -126,7 +129,8 @@ describe('BackupSettings', () => {
       const { container } = render(BackupSettings);
 
       await user.click(screen.getByRole('switch', { name: 'admin.backup_s3_enabled' }));
-      await user.type(field(container, 'admin.backup_s3_bucket')!, 'db-backups');
+      await user.clear(field(container, 'admin.backup_s3_prefix')!);
+      await user.type(field(container, 'admin.backup_s3_prefix')!, 'nightly/');
       await user.click(screen.getByRole('button', { name: 'save' }));
 
       expect(handleSystemConfigSave).toHaveBeenCalledWith({
@@ -135,22 +139,21 @@ describe('BackupSettings', () => {
             enabled: true,
             cronExpression: '0 02 * * *',
             keepLastAmount: 14,
-            s3: { enabled: true, bucket: 'db-backups', prefix: 'immich-db-backups/' },
+            s3: { enabled: true, prefix: 'nightly/' },
           },
         },
       });
     });
 
-    // Config-file mode makes the whole section read-only upstream; the new fields must follow.
+    // Config-file mode makes the whole section read-only upstream; the new controls must follow.
     it('keeps everything disabled in config-file mode', () => {
       mocks.featureFlags.configFile = true;
-      mocks.systemConfig = makeConfig({ enabled: true, bucket: 'db-backups', prefix: 'db/' });
+      mocks.systemConfig = makeConfig({ enabled: true, prefix: 'db/' });
       mocks.cloneValue.mockImplementation(() => structuredClone(mocks.systemConfig));
 
       const { container } = render(BackupSettings);
 
       expect(screen.getByRole('switch', { name: 'admin.backup_s3_enabled' })).toBeDisabled();
-      expect(field(container, 'admin.backup_s3_bucket')).toBeDisabled();
       expect(field(container, 'admin.backup_s3_prefix')).toBeDisabled();
     });
   });

@@ -4,7 +4,12 @@ import { MaintenanceModule } from 'src/app.module.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
-import { BackupStoreResolver, normalizeBackupPrefix, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
+import {
+  BackupStoreResolver,
+  DEFAULT_BACKUP_PREFIX,
+  normalizeBackupPrefix,
+  validateBackupS3Config,
+} from 'src/gallery/utils/backup-store.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
@@ -27,8 +32,11 @@ describe('BackupStoreResolver', () => {
   let sut: TestBackupStoreResolver;
   let mocks: ServiceMocks;
 
-  const withS3Config = (s3: { enabled?: boolean; bucket?: string; prefix?: string }) =>
+  const withS3Config = (s3: { enabled?: boolean; prefix?: string }) =>
     mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { s3 } } });
+
+  const onS3 = (bucket = 'media') =>
+    mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3: { bucket } as never } }));
 
   beforeEach(() => {
     mocks = getMocks();
@@ -56,7 +64,7 @@ describe('BackupStoreResolver', () => {
     });
 
     it('leaves the remote unset when the storage backend is not s3, and warns', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups' });
+      withS3Config({ enabled: true });
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 'disk' } }));
 
       const store = await sut.resolve();
@@ -65,18 +73,18 @@ describe('BackupStoreResolver', () => {
       expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('storage backend is not S3'));
     });
 
-    it('leaves the remote unset when no bucket is resolvable, and warns', async () => {
-      withS3Config({ enabled: true, bucket: '' });
-      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3: { bucket: '' } as never } }));
+    it('leaves the remote unset when IMMICH_S3_BUCKET is not set, and warns', async () => {
+      withS3Config({ enabled: true });
+      onS3('');
 
       const store = await sut.resolve();
 
       expect(store.remote).toBeUndefined();
-      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('no bucket is set'));
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('IMMICH_S3_BUCKET is not set'));
     });
 
     it('warns only once while the same misconfiguration persists', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups' });
+      withS3Config({ enabled: true });
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 'disk' } }));
 
       await sut.resolve();
@@ -86,71 +94,47 @@ describe('BackupStoreResolver', () => {
       expect(mocks.logger.warn).toHaveBeenCalledTimes(1);
     });
 
-    it('resolves a remote when the backend is s3, the flag is on and a bucket is set', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups', prefix: 'nightly/' });
-      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
+    it('resolves a remote when the backend is s3, the flag is on and a bucket is configured', async () => {
+      withS3Config({ enabled: true, prefix: 'nightly/' });
+      onS3();
 
       const store = await sut.resolve();
 
-      expect(store.remote?.bucket).toBe('db-backups');
+      expect(store.remote?.bucket).toBe('media');
       expect(store.remote?.key('immich-db-backup-1.sql.gz')).toBe('nightly/immich-db-backup-1.sql.gz');
     });
   });
 
   describe('credential reuse', () => {
-    it('builds the S3 client from the media credentials with only the bucket substituted', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups' });
-      mocks.config.getEnv.mockReturnValue(
-        mockEnvData({
-          storage: {
-            backend: 's3',
-            s3: {
-              bucket: 'media',
-              region: 'eu-central-1',
-              endpoint: 'http://minio:9000',
-              accessKeyId: 'key',
-              secretAccessKey: 'secret',
-              presignedUrlExpiry: 900,
-              serveMode: 'proxy',
-            },
-          },
-        }),
-      );
-
-      await sut.resolve();
-
-      expect(sut.built).toEqual([
-        {
-          bucket: 'db-backups',
-          region: 'eu-central-1',
-          endpoint: 'http://minio:9000',
-          accessKeyId: 'key',
-          secretAccessKey: 'secret',
-          presignedUrlExpiry: 900,
-          serveMode: 'proxy',
-        },
-      ]);
-    });
-
-    it('falls back to the media bucket when the backup bucket is empty', async () => {
-      withS3Config({ enabled: true, bucket: '' });
-      mocks.config.getEnv.mockReturnValue(
-        mockEnvData({ storage: { backend: 's3', s3: { bucket: 'media' } as never } }),
-      );
+    // The whole point of the gate: there is no second set of S3 settings to get wrong, and nothing
+    // here comes from the saved config, so no S3 secret is ever stored in the database.
+    it('builds the S3 client from the media settings verbatim, bucket included', async () => {
+      withS3Config({ enabled: true });
+      const s3 = {
+        bucket: 'media',
+        region: 'eu-central-1',
+        endpoint: 'http://minio:9000',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        presignedUrlExpiry: 900,
+        serveMode: 'proxy' as const,
+      };
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3 } }));
 
       const store = await sut.resolve();
 
+      expect(sut.built).toEqual([s3]);
       expect(store.remote?.bucket).toBe('media');
     });
   });
 
   describe('client caching', () => {
     beforeEach(() => {
-      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
+      onS3();
     });
 
     it('reuses the client across resolves while the settings are unchanged', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups' });
+      withS3Config({ enabled: true, prefix: 'nightly/' });
 
       const first = await sut.resolve();
       const second = await sut.resolve();
@@ -160,24 +144,43 @@ describe('BackupStoreResolver', () => {
     });
 
     it('rebuilds the client when the resolved settings change', async () => {
-      withS3Config({ enabled: true, bucket: 'db-backups' });
+      withS3Config({ enabled: true, prefix: 'first/' });
       await sut.resolve();
 
-      withS3Config({ enabled: true, bucket: 'other-bucket' });
+      withS3Config({ enabled: true, prefix: 'second/' });
       const store = await sut.resolve();
 
-      expect(sut.built.map(({ bucket }) => bucket)).toEqual(['db-backups', 'other-bucket']);
-      expect(store.remote?.bucket).toBe('other-bucket');
+      expect(sut.built).toHaveLength(2);
+      expect(store.remote?.key('x.sql.gz')).toBe('second/x.sql.gz');
+    });
+
+    it('rebuilds the client when the media bucket changes under it', async () => {
+      withS3Config({ enabled: true, prefix: 'nightly/' });
+      await sut.resolve();
+
+      onS3('other-media');
+      const store = await sut.resolve();
+
+      expect(sut.built.map(({ bucket }) => bucket)).toEqual(['media', 'other-media']);
+      expect(store.remote?.bucket).toBe('other-media');
+    });
+
+    it('falls back to the default prefix when a stored config has none', async () => {
+      withS3Config({ enabled: true, prefix: '' });
+
+      const store = await sut.resolve();
+
+      expect(store.remote?.key('x.sql.gz')).toBe(`${DEFAULT_BACKUP_PREFIX}x.sql.gz`);
     });
 
     it('reads the config fresh on every resolve, so an admin edit applies without a restart', async () => {
-      withS3Config({ enabled: false, bucket: 'db-backups' });
+      withS3Config({ enabled: false });
       const offStore = await sut.resolve();
       expect(offStore.remote).toBeUndefined();
 
-      withS3Config({ enabled: true, bucket: 'db-backups' });
+      withS3Config({ enabled: true });
       const onStore = await sut.resolve();
-      expect(onStore.remote?.bucket).toBe('db-backups');
+      expect(onStore.remote).toBeDefined();
     });
   });
 });
@@ -188,6 +191,7 @@ describe('normalizeBackupPrefix', () => {
     ${'immich-db-backups'} | ${'immich-db-backups/'}
     ${'immich/db/'}        | ${'immich/db/'}
     ${'/leading'}          | ${'leading/'}
+    ${` /padded `}         | ${'padded/'}
     ${''}                  | ${''}
     ${' '.repeat(3)}       | ${''}
   `('normalizes $input to $expected', ({ input, expected }) => {
@@ -195,10 +199,8 @@ describe('normalizeBackupPrefix', () => {
   });
 });
 
-const configWith = (enabled: boolean) =>
-  ({
-    backup: { database: { ...defaults.backup.database, s3: { enabled, bucket: '', prefix: '' } } },
-  }) as SystemConfig;
+const configWith = (enabled: boolean, prefix = 'immich-db-backups/') =>
+  ({ backup: { database: { ...defaults.backup.database, s3: { enabled, prefix } } } }) as SystemConfig;
 
 describe('validateBackupS3Config', () => {
   it('refuses to enable S3 backups while the storage backend is disk', () => {
@@ -213,6 +215,18 @@ describe('validateBackupS3Config', () => {
 
   it('allows a disk-backed server to leave S3 backups off', () => {
     expect(() => validateBackupS3Config(configWith(false), { storage: { backend: 'disk' } })).not.toThrow();
+  });
+
+  // Backups share the media bucket now that there is no bucket of their own, so an empty prefix would
+  // scatter dumps across the media key space and make every listing enumerate the whole bucket.
+  it.each([[''], [' '.repeat(3)], ['/']])('refuses an empty prefix (%j) while enabled', (prefix) => {
+    expect(() => validateBackupS3Config(configWith(true, prefix), { storage: { backend: 's3' } })).toThrow(
+      /key prefix is required/,
+    );
+  });
+
+  it('ignores an empty prefix while disabled', () => {
+    expect(() => validateBackupS3Config(configWith(false, ''), { storage: { backend: 'disk' } })).not.toThrow();
   });
 });
 
