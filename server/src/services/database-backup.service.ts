@@ -1,16 +1,18 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { debounce } from 'lodash-es';
 import { DateTime } from 'luxon';
-import path, { basename } from 'node:path';
+import { basename } from 'node:path';
 import { Duplex, PassThrough, Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { coerce, satisfies } from 'semver';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import { serverVersion } from 'src/constants.js';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
+import { SystemConfig } from 'src/dtos/config.dto.js';
 import { DatabaseBackupListResponseDto } from 'src/dtos/database-backup.dto.js';
-import { CacheControl, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName, StorageFolder } from 'src/enum.js';
+import { CacheControl, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
+import { BackupStore, BackupStoreResolver, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
+import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -29,8 +31,16 @@ import {
   isValidDatabaseBackupName,
   isValidDatabaseRoutineBackupName,
 } from 'src/utils/database-backups.js';
-import { ImmichFileResponse } from 'src/utils/file.js';
+import {
+  ImmichFileResponse,
+  ImmichMediaResponse,
+  ImmichRedirectResponse,
+  ImmichStreamResponse,
+  getResponseSignal,
+} from 'src/utils/file.js';
 import { handlePromiseError } from 'src/utils/misc.js';
+
+const backupContentType = (filename: string) => (filename.endsWith('.gz') ? 'application/gzip' : 'application/sql');
 
 @Injectable()
 export class DatabaseBackupService {
@@ -50,9 +60,34 @@ export class DatabaseBackupService {
     private readonly maintenanceHealthRepository: MaintenanceHealthRepository,
   ) {
     this.logger.setContext(this.constructor.name);
+    // Gallery-fork: all backup file IO goes through storage backends, so the destination is
+    // configuration rather than a hardcoded path. See src/gallery/utils/backup-store.ts.
+    this.backupStore = new BackupStoreResolver({
+      configRepository: this.configRepository,
+      storageRepository: this.storageRepository,
+      logger: this.logger,
+      getConfig: () => this.loadConfig(),
+    });
   }
 
   private backupLock = false;
+  private readonly backupStore: BackupStoreResolver;
+
+  private loadConfig(): Promise<SystemConfig> {
+    return getConfig(
+      {
+        configRepo: this.configRepository,
+        metadataRepo: this.systemMetadataRepository,
+        logger: this.logger,
+      },
+      { withCache: false },
+    );
+  }
+
+  @OnEvent({ name: 'ConfigValidate' })
+  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
+    validateBackupS3Config(newConfig, this.configRepository.getEnv());
+  }
 
   @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
   async onConfigInit({
@@ -224,6 +259,14 @@ export class DatabaseBackupService {
     };
   }
 
+  /**
+   * Returns the backup's filename, which every other operation here resolves to a backend key.
+   *
+   * Staged write: `pg_dump | gzip` lands on the staging disk under a `.tmp` key, the finished file is
+   * promoted to its real name (so a dump killed half way can never be mistaken for a valid backup),
+   * and only then is it uploaded to S3 and the local copy removed. A prefixed backup is a restore
+   * point, which is the restore flow's own local safety net and so is never uploaded.
+   */
   async createDatabaseBackup(filenamePrefix: string = ''): Promise<string> {
     this.logger.debug(`Database Backup Started`);
 
@@ -233,8 +276,9 @@ export class DatabaseBackupService {
     this.logger.log(`Database Backup Starting. Database Version: ${databaseMajorVersion}`);
 
     const filename = `${filenamePrefix}immich-db-backup-${DateTime.now().toFormat("yyyyLLdd'T'HHmmss")}-v${serverVersion.toString()}-pg${databaseVersion.split(' ', 1)[0]}.sql.gz`;
-    const backupFilePath = path.join(StorageCore.getBaseFolder(StorageFolder.Backups), filename);
-    const temporaryFilePath = `${backupFilePath}.tmp`;
+    const store = await this.backupStore.resolve();
+    const backupKey = store.stagingKey(filename);
+    const temporaryKey = `${backupKey}.tmp`;
 
     let pgdump: Duplex | undefined;
     let gzip: Duplex | undefined;
@@ -248,67 +292,169 @@ export class DatabaseBackupService {
       });
 
       gzip = this.processRepository.spawnDuplexStream('gzip', ['--rsyncable']);
-      const fileStream = this.storageRepository.createWriteStream(temporaryFilePath);
 
-      await pipeline(pgdump, gzip, fileStream);
-      await this.storageRepository.rename(temporaryFilePath, backupFilePath);
+      // The backend owns the destination, so it consumes the stream rather than being handed a write
+      // stream. `pipeline`'s own completion is tracked separately: a pg_dump or gzip failure destroys
+      // `dump`, which surfaces as `put` rejecting, and the captured error is the one worth reporting.
+      const dump = new PassThrough();
+      let dumpError: unknown;
+      const dumpPipeline = pipeline(pgdump, gzip, dump).catch((error: unknown) => {
+        dumpError = error;
+      });
+
+      await store.staging.put(temporaryKey, dump, { contentType: backupContentType(filename) });
+      await dumpPipeline;
+      if (dumpError) {
+        throw dumpError;
+      }
+
+      await store.staging.rename(temporaryKey, backupKey);
     } catch (error) {
       this.logger.error(`Database Backup Failure: ${error}`);
       pgdump?.destroy();
       gzip?.destroy();
-      await this.storageRepository
-        .unlink(temporaryFilePath)
-
+      await store.staging
+        .delete(temporaryKey)
         .catch((error) => this.logger.error(`Failed to delete failed backup file: ${error}`));
       throw error;
     }
 
+    if (filenamePrefix === '') {
+      await this.promoteToRemote(store, filename);
+    }
+
     this.logger.log(`Database Backup Success`);
-    return backupFilePath;
+    return filename;
+  }
+
+  /**
+   * The staged promote. An upload failure throws, so the job reports `Failed` with the bucket named and
+   * the local file still in place for the next run to retry; a delete failure after a good upload is
+   * only logged, because the object is safely in S3 and the straggler is swept by the next cleanup.
+   * A no-op when no remote is configured.
+   */
+  private async promoteToRemote(store: BackupStore, filename: string): Promise<void> {
+    const { remote } = store;
+    if (!remote) {
+      return;
+    }
+
+    const stagingKey = store.stagingKey(filename);
+    const remoteKey = remote.key(filename);
+
+    try {
+      const { stream } = await store.staging.get(stagingKey);
+      await remote.backend.put(remoteKey, stream, { contentType: backupContentType(filename) });
+    } catch (error) {
+      throw new Error(
+        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${remoteKey}). The backup is still on local disk and the next run will retry the upload.`,
+        { cause: error },
+      );
+    }
+
+    this.logger.log(`Database Backup uploaded to S3 (bucket: ${remote.bucket}, key: ${remoteKey})`);
+
+    await store.staging
+      .delete(stagingKey)
+      .catch((error) =>
+        this.logger.warn(`Uploaded ${filename} to S3 but failed to delete the local copy: ${error}`),
+      );
+  }
+
+  /**
+   * Local first, then remote. A backup whose upload failed is still on disk, and must stay downloadable
+   * and restorable from there; everything else has been promoted and only exists in the bucket.
+   */
+  private async locate(store: BackupStore, filename: string): Promise<{ backend: StorageBackend; key: string }> {
+    const stagingKey = store.stagingKey(filename);
+    if (await store.staging.exists(stagingKey)) {
+      return { backend: store.staging, key: stagingKey };
+    }
+
+    if (store.remote) {
+      const remoteKey = store.remote.key(filename);
+      if (await store.remote.backend.exists(remoteKey)) {
+        return { backend: store.remote.backend, key: remoteKey };
+      }
+    }
+
+    throw new NotFoundException(`Backup ${filename} was not found`);
   }
 
   async uploadBackup(file: Express.Multer.File): Promise<void> {
-    const backupsFolder = StorageCore.getBaseFolder(StorageFolder.Backups);
     const fn = basename(file.originalname);
     if (!isValidDatabaseBackupName(fn)) {
       throw new BadRequestException('Invalid backup name!');
     }
 
-    const filePath = path.join(backupsFolder, `uploaded-${fn}`);
-    await this.storageRepository.createOrOverwriteFile(filePath, file.buffer);
+    const filename = `uploaded-${fn}`;
+    const store = await this.backupStore.resolve();
+    await store.staging.put(store.stagingKey(filename), file.buffer, { contentType: backupContentType(filename) });
+    await this.promoteToRemote(store, filename);
   }
 
-  downloadBackup(fileName: string): ImmichFileResponse {
+  /**
+   * Returns a served response rather than a path, because an S3 object has no path. The three
+   * strategies a backend can answer with map onto the three responses `sendFile` already handles, so
+   * both call sites (the admin controller and the maintenance worker) are unchanged.
+   */
+  async downloadBackup(fileName: string): Promise<ImmichMediaResponse> {
     if (!isValidDatabaseBackupName(fileName)) {
       throw new BadRequestException('Invalid backup name!');
     }
 
-    const filePath = path.join(StorageCore.getBaseFolder(StorageFolder.Backups), fileName);
+    const store = await this.backupStore.resolve();
+    const { backend, key } = await this.locate(store, fileName);
+    const contentType = backupContentType(fileName);
+    const cacheControl = CacheControl.PrivateWithoutCache;
 
-    return {
-      path: filePath,
+    const strategy = await backend.getServeStrategy(key, {
+      contentType,
+      cacheControl,
       fileName,
-      cacheControl: CacheControl.PrivateWithoutCache,
-      contentType: fileName.endsWith('.gz') ? 'application/gzip' : 'application/sql',
-    };
+      signal: getResponseSignal(),
+    });
+
+    switch (strategy.type) {
+      case 'file': {
+        return new ImmichFileResponse({ path: strategy.path, contentType, cacheControl, fileName });
+      }
+      case 'redirect': {
+        return new ImmichRedirectResponse({ url: strategy.url, cacheControl });
+      }
+      case 'stream': {
+        return new ImmichStreamResponse({
+          stream: strategy.stream,
+          contentType,
+          length: strategy.length,
+          cacheControl,
+          fileName,
+        });
+      }
+    }
   }
 
   async listBackups(): Promise<DatabaseBackupListResponseDto> {
-    const backupsFolder = StorageCore.getBaseFolder(StorageFolder.Backups);
-    const files = await this.storageRepository.readdir(backupsFolder);
+    const store = await this.backupStore.resolve();
     const timezone = DateTime.local().zoneName;
 
-    const validFiles = files
+    // Union of both backends, deduplicated by filename, so a partial outage still shows one coherent
+    // set. Local is read last and wins: during a failed upload it is the copy an admin can download.
+    const sizes = new Map<string, number>();
+    if (store.remote) {
+      for (const { key, size } of await store.remote.backend.list(store.remote.key(''))) {
+        sizes.set(basename(key), size);
+      }
+    }
+    for (const { key, size } of await store.staging.list(store.stagingKey(''))) {
+      sizes.set(basename(key), size);
+    }
+
+    const backups = [...sizes.keys()]
       .filter((fn) => isValidDatabaseBackupName(fn))
       .toSorted((a, b) => (a.startsWith('uploaded-') === b.startsWith('uploaded-') ? a.localeCompare(b) : 1))
-      .toReversed();
-
-    const backups = await Promise.all(
-      validFiles.map(async (filename) => {
-        const stats = await this.storageRepository.stat(path.join(backupsFolder, filename));
-        return { filename, filesize: stats.size, timezone };
-      }),
-    );
+      .toReversed()
+      .map((filename) => ({ filename, filesize: sizes.get(filename) ?? 0, timezone }));
 
     return {
       backups,
@@ -316,46 +462,84 @@ export class DatabaseBackupService {
   }
 
   async deleteBackup(files: string[]): Promise<void> {
-    const backupsFolder = StorageCore.getBaseFolder(StorageFolder.Backups);
-
     if (files.some((filename) => !isValidDatabaseBackupName(filename))) {
       throw new BadRequestException('Invalid backup name!');
     }
 
-    await Promise.all(files.map((filename) => this.storageRepository.unlink(path.join(backupsFolder, filename))));
+    const store = await this.backupStore.resolve();
+    const { remote } = store;
+
+    // Delete from wherever it is. The local copy is normally already gone once promoted, and
+    // `delete` is a no-op on a missing disk file, so both sides are safe to attempt.
+    await Promise.all(
+      files.flatMap((filename) => [
+        store.staging.delete(store.stagingKey(filename)),
+        ...(remote ? [remote.backend.delete(remote.key(filename))] : []),
+      ]),
+    );
   }
 
   async cleanupDatabaseBackups() {
     this.logger.debug(`Database Backup Cleanup Started`);
     const {
       backup: { database: config },
-    } = await getConfig(
-      {
-        configRepo: this.configRepository,
-        metadataRepo: this.systemMetadataRepository,
-        logger: this.logger,
-      },
-      {
-        withCache: false,
-      },
-    );
+    } = await this.loadConfig();
 
-    const backupsFolder = StorageCore.getBaseFolder(StorageFolder.Backups);
-    const files = await this.storageRepository.readdir(backupsFolder);
-    const backups = files
-      .filter((filename) => isValidDatabaseRoutineBackupName(filename))
-      .toSorted()
-      .toReversed();
-    const failedBackups = files.filter((filename) => isFailedDatabaseBackupName(filename));
+    const store = await this.backupStore.resolve();
+    const { remote } = store;
 
-    const toDelete = backups.slice(config.keepLastAmount);
-    toDelete.push(...failedBackups);
+    const localNames = async () => (await store.staging.list(store.stagingKey(''))).map(({ key }) => basename(key));
 
-    for (const file of toDelete) {
-      await this.storageRepository.unlink(path.join(backupsFolder, file));
+    // Retry stragglers first: a backup left on disk by a failed upload is promoted rather than
+    // orphaned, and a local copy that is already in the bucket is just a duplicate.
+    if (remote) {
+      const remoteNames = new Set(
+        (await remote.backend.list(remote.key(''))).map(({ key }) => basename(key)),
+      );
+      for (const filename of await localNames()) {
+        if (!isValidDatabaseRoutineBackupName(filename)) {
+          continue;
+        }
+        if (remoteNames.has(filename)) {
+          await store.staging.delete(store.stagingKey(filename));
+          continue;
+        }
+        await this.promoteToRemote(store, filename);
+      }
     }
 
-    this.logger.debug(`Database Backup Cleanup Finished, deleted ${toDelete.length} backups`);
+    // Retention applies to whichever backend holds the canonical set. Pruning the staging disk while
+    // S3 is on would delete a straggler the next run could still promote.
+    const canonical = remote
+      ? {
+          list: async () => (await remote.backend.list(remote.key(''))).map(({ key }) => basename(key)),
+          delete: (filename: string) => remote.backend.delete(remote.key(filename)),
+        }
+      : {
+          list: localNames,
+          delete: (filename: string) => store.staging.delete(store.stagingKey(filename)),
+        };
+
+    const toDelete = (await canonical.list())
+      .filter((filename) => isValidDatabaseRoutineBackupName(filename))
+      .toSorted()
+      .toReversed()
+      .slice(config.keepLastAmount);
+
+    for (const filename of toDelete) {
+      await canonical.delete(filename);
+    }
+
+    // Failed dumps are always local — the promote only ever runs on a finished file — so the staging
+    // disk is swept for them whichever backend is canonical.
+    const failedBackups = (await localNames()).filter((filename) => isFailedDatabaseBackupName(filename));
+    for (const filename of failedBackups) {
+      await store.staging.delete(store.stagingKey(filename));
+    }
+
+    this.logger.debug(
+      `Database Backup Cleanup Finished, deleted ${toDelete.length + failedBackups.length} backups`,
+    );
   }
 
   async restoreDatabaseBackup(
@@ -370,8 +554,10 @@ export class DatabaseBackupService {
         throw new Error('Invalid backup file format!');
       }
 
-      const backupFilePath = path.join(StorageCore.getBaseFolder(StorageFolder.Backups), filename);
-      await this.storageRepository.stat(backupFilePath); // => check file exists
+      const store = await this.backupStore.resolve();
+      // resolves to the bucket when the backup has already been promoted, so restoring from S3 needs
+      // no separate download step
+      const source = await this.locate(store, filename);
 
       let isPgClusterDump = false;
       const version = findDatabaseBackupVersion(filename);
@@ -386,18 +572,18 @@ export class DatabaseBackupService {
 
       progressCb?.('backup', 0.05);
 
-      const restorePointFilePath = await this.createDatabaseBackup('restore-point-');
+      const restorePointFilename = await this.createDatabaseBackup('restore-point-');
 
       this.logger.log(`Database Restore Starting. Database Version: ${databaseMajorVersion}`);
 
       let inputStream: Readable;
-      if (backupFilePath.endsWith('.gz')) {
-        const fileStream = this.storageRepository.createPlainReadStream(backupFilePath);
+      const { stream: backupStream } = await source.backend.get(source.key);
+      if (filename.endsWith('.gz')) {
         const gunzip = this.storageRepository.createGunzip();
-        fileStream.pipe(gunzip);
+        backupStream.pipe(gunzip);
         inputStream = gunzip;
       } else {
-        inputStream = this.storageRepository.createPlainReadStream(backupFilePath);
+        inputStream = backupStream;
       }
 
       const sqlStream = Readable.from(sql(inputStream, databaseUsername, isPgClusterDump));
@@ -433,9 +619,10 @@ export class DatabaseBackupService {
       } catch (error) {
         progressCb?.('rollback', 0);
 
-        const fileStream = this.storageRepository.createPlainReadStream(restorePointFilePath);
+        // the restore point is never promoted, so it is always on the staging disk
+        const { stream: restorePointStream } = await store.staging.get(store.stagingKey(restorePointFilename));
         const gunzip = this.storageRepository.createGunzip();
-        fileStream.pipe(gunzip);
+        restorePointStream.pipe(gunzip);
         inputStream = gunzip;
 
         const sqlStream = Readable.from(sqlRollback(inputStream, databaseUsername));

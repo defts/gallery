@@ -203,6 +203,27 @@ export class S3StorageBackend implements StorageBackend {
     } while (continuationToken);
   }
 
+  async list(prefix: string): Promise<Array<{ key: string; size: number }>> {
+    const results: Array<{ key: string; size: number }> = [];
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: continuationToken }),
+      );
+      for (const object of page.Contents ?? []) {
+        // S3 has no directories, but a console-created "folder" shows up as a zero-byte key
+        // ending in `/`; it is not an object any caller can read.
+        if (!object.Key || object.Key.endsWith('/')) {
+          continue;
+        }
+        results.push({ key: object.Key, size: object.Size ?? 0 });
+      }
+      continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return results;
+  }
+
   async getPrefixUsage(prefix: string, shouldCount?: (filename: string) => boolean): Promise<number> {
     let total = 0;
     let continuationToken: string | undefined;

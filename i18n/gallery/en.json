@@ -12,6 +12,13 @@
   "added_to_collections_count": "Added to {count, plural, one {# collection} other {# collections}}",
   "added_to_space_count": "Added {count, plural, one {# asset} other {# assets}} to space",
   "admin": {
+    "backup_s3_bucket": "Backup bucket",
+    "backup_s3_bucket_description": "Leave empty to use the same bucket as your media",
+    "backup_s3_credentials_hint": "Backups use the server's existing S3 credentials, region and endpoint. While this is on, each new backup is uploaded to the bucket and then removed from local disk.",
+    "backup_s3_enabled": "Upload backups to S3",
+    "backup_s3_enabled_description": "Store scheduled database backups in object storage instead of on the server disk",
+    "backup_s3_prefix": "Backup key prefix",
+    "backup_s3_prefix_description": "Folder inside the bucket that backup objects are written to",
     "birthday_memories_setting": "Birthday memories",
     "birthday_memories_setting_description": "Create generated memories for people on their birthdays",
     "classification_action_tag": "Tag only",

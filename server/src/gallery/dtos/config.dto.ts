@@ -17,6 +17,20 @@ export const galleryConfigBool = z
   }, z.boolean())
   .meta({ type: 'boolean' });
 
+// Gallery-fork: scheduled database backups to S3. Deliberately three fields — region, endpoint and
+// credentials are NOT here, because the feature is only offered when the server's storage backend is
+// already S3 (IMMICH_STORAGE_BACKEND=s3), so the only credentials that could apply are the ones the
+// media backend is already using. That keeps secrets out of the database and out of GET /admin/config,
+// which redacts nothing today. A separate bucket is still worth allowing even though it defaults to the
+// media one: backups want their own lifecycle rules, retention and access policy.
+export const GalleryBackupS3Schema = z
+  .object({
+    enabled: galleryConfigBool.describe('Upload scheduled database backups to S3'),
+    bucket: z.string().describe('Bucket for database backups. Empty reuses the media bucket (IMMICH_S3_BUCKET).'),
+    prefix: z.string().describe('Key prefix for database backup objects'),
+  })
+  .meta({ id: 'AdminConfigDatabaseBackupS3Dto' });
+
 const GalleryClassificationFaceExclusionSchema = z
   .enum(['off', 'any_assigned_face', 'named_people', 'named_visible_people'])
   .default('off')
@@ -160,6 +174,11 @@ export const galleryMachineLearningDefaults = {
   faceSuggestions: { enabled: true, maxDistance: 0.7 },
   petDetection: { enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 },
   petRecognition: { enabled: false, modelName: 'pet-recognition-base', maxDistance: 0.55, minFaces: 1 },
+};
+
+export const galleryBackupDatabaseDefaults = {
+  // off out of the box, so a fresh install behaves exactly like upstream Immich
+  s3: { enabled: false, bucket: '', prefix: 'immich-db-backups/' },
 };
 
 export const galleryServerDefaults = { mergePeopleAcrossOwners: false };
