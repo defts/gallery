@@ -132,12 +132,13 @@ the upload only ever runs on the promoted file, so no `.tmp` key ever reaches S3
 
 ## 3. Failure semantics
 
-| Step fails                       | Result                                                                                                                               |
-| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
-| `pg_dump` / `gzip`               | Unchanged from before: the `.tmp` key is deleted, nothing is promoted, the job fails.                                                |
-| S3 upload                        | **The local file is kept**, retention still runs, and the job then fails with the bucket named. The next run retries the upload.     |
-| Local delete after a good upload | Warned, job still succeeds — the object is safely in S3, and the straggler is swept by the next cleanup.                             |
-| Listing the bucket               | Warned; the backup list falls back to the local one, so an unreachable bucket cannot hide backups an admin could still restore from. |
+| Step fails                       | Result                                                                                                                                                                    |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pg_dump` / `gzip`               | Unchanged from before: the `.tmp` key is deleted, nothing is promoted, the job fails.                                                                                     |
+| S3 upload                        | **The local file is kept**, retention still runs, and the job then fails with the bucket named. The next run retries the upload.                                          |
+| Local delete after a good upload | Warned, job still succeeds — the object is safely in S3, and the straggler is swept by the next cleanup.                                                                  |
+| Listing the bucket               | Warned; retention prunes what it can see and the backup list falls back to the local one, so an unreachable bucket neither stops retention nor hides a restorable backup. |
+| A single delete                  | Warned; the remaining backups are still pruned.                                                                                                                           |
 
 So a broken bucket or an expired credential degrades to the old local-only behaviour rather than losing backups
 or stopping retention.

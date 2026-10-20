@@ -716,7 +716,10 @@ describe('S3StorageBackend', () => {
       const listInputs = mockSend.mock.calls
         .filter(([cmd]) => cmd._type === 'ListObjectsV2Command')
         .map(([cmd]) => cmd.input);
-      expect(listInputs).toEqual([expect.objectContaining({ Bucket: 'test-bucket', Prefix: 'db/' })]);
+      // `Delimiter` is what keeps this to the direct children the interface promises. Without it a
+      // nested key comes back whose filename no longer reconstructs the key, so a caller round-tripping
+      // a listing into `delete` — which is what backup retention does — silently deletes nothing.
+      expect(listInputs).toEqual([expect.objectContaining({ Bucket: 'test-bucket', Prefix: 'db/', Delimiter: '/' })]);
     });
 
     it('should paginate via ContinuationToken across multiple pages', async () => {

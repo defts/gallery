@@ -11,23 +11,63 @@ import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { AutoMocked, ServiceMocks, automock, getMocks, mockDuplex, mockSpawn } from 'test/utils.js';
 
 /**
- * Every backup file operation now goes through a storage backend, so these are the seams the service
- * is asserted against. `put` drains its source: the dump pipeline only completes once something has
- * consumed the gzip output, exactly as a real backend does.
+ * Every backup file operation now goes through a storage backend, so these are the seams the service is
+ * asserted against.
+ *
+ * Deliberately STATEFUL, tracking the keys it holds: a fake whose `get` succeeds for any key and whose
+ * `list` ignores what was written would pass a service that promoted the wrong key or forgot to write at
+ * all, and would make the dump-then-promote flow untestable end to end. `put` drains its source, because
+ * the dump pipeline only completes once something has consumed the gzip output, exactly as a real backend
+ * does. Tests that only care about one call still override the individual mocks.
  */
-const fakeBackend = () => ({
-  put: vitest.fn(async (_key: string, source: Readable | Buffer) => {
-    if (!Buffer.isBuffer(source)) {
-      await buffer(source);
-    }
-  }),
-  get: vitest.fn((_key: string) => Promise.resolve({ stream: Readable.from(mockData()) })),
-  delete: vitest.fn((_key: string) => Promise.resolve()),
-  exists: vitest.fn((_key: string) => Promise.resolve(true)),
-  list: vitest.fn((_prefix: string) => Promise.resolve([] as Array<{ key: string; size: number }>)),
-  rename: vitest.fn((_from: string, _to: string) => Promise.resolve()),
-  getServeStrategy: vitest.fn((key: string) => Promise.resolve({ type: 'file' as const, path: `/data/${key}` })),
-});
+const fakeBackend = () => {
+  const held = new Map<string, number>();
+
+  const backend = {
+    held,
+    seed: (...keys: string[]) => {
+      for (const key of keys) {
+        held.set(key, 1);
+      }
+    },
+    put: vitest.fn(async (key: string, source: Readable | Buffer) => {
+      const body = Buffer.isBuffer(source) ? source : await buffer(source);
+      held.set(key, body.length);
+    }),
+    get: vitest.fn((key: string) => {
+      if (!held.has(key)) {
+        return Promise.reject(new Error(`ENOENT: ${key}`));
+      }
+      return Promise.resolve({ stream: Readable.from(mockData()) });
+    }),
+    delete: vitest.fn((key: string) => {
+      held.delete(key);
+      return Promise.resolve();
+    }),
+    exists: vitest.fn((key: string) => Promise.resolve(held.has(key))),
+    list: vitest.fn((prefix: string) =>
+      Promise.resolve(
+        held
+          .entries()
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, size]) => ({ key, size }))
+          .toArray(),
+      ),
+    ),
+    rename: vitest.fn((from: string, to: string) => {
+      const size = held.get(from);
+      if (size === undefined) {
+        return Promise.reject(new Error(`ENOENT: ${from}`));
+      }
+      held.delete(from);
+      held.set(to, size);
+      return Promise.resolve();
+    }),
+    getServeStrategy: vitest.fn((key: string) => Promise.resolve({ type: 'file' as const, path: `/data/${key}` })),
+  };
+
+  return backend;
+};
 
 type FakeBackend = ReturnType<typeof fakeBackend>;
 
@@ -152,7 +192,7 @@ describe(DatabaseBackupService.name, () => {
     });
 
     it('should do nothing if not reached keepLastAmount', async () => {
-      staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
+      staging.seed(...listing('immich-db-backup-1.sql.gz').map(({ key }) => key));
       await sut.cleanupDatabaseBackups();
       expect(staging.delete).not.toHaveBeenCalled();
     });
@@ -178,7 +218,7 @@ describe(DatabaseBackupService.name, () => {
     });
 
     it('should remove old backup files over keepLastAmount', async () => {
-      staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz'));
+      staging.seed(...listing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz').map(({ key }) => key));
       await sut.cleanupDatabaseBackups();
       expect(staging.delete).toHaveBeenCalledTimes(1);
       expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
@@ -208,8 +248,8 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should prune the S3 objects over keepLastAmount, not the local folder', async () => {
-        staging.list.mockResolvedValue([]);
-        remote.list.mockResolvedValue(remoteListing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz'));
+        staging.held.clear();
+        remote.seed(...remoteListing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz').map(({ key }) => key));
 
         await sut.cleanupDatabaseBackups();
 
@@ -218,8 +258,8 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should promote a straggler left by a failed upload rather than orphaning it', async () => {
-        staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
-        remote.list.mockResolvedValue([]);
+        staging.seed(...listing('immich-db-backup-1.sql.gz').map(({ key }) => key));
+        remote.held.clear();
 
         await sut.cleanupDatabaseBackups();
 
@@ -230,8 +270,8 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should delete a local copy that is already in the bucket without re-uploading it', async () => {
-        staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
-        remote.list.mockResolvedValue(remoteListing('immich-db-backup-1.sql.gz'));
+        staging.seed(...listing('immich-db-backup-1.sql.gz').map(({ key }) => key));
+        remote.seed(...remoteListing('immich-db-backup-1.sql.gz').map(({ key }) => key));
 
         await sut.cleanupDatabaseBackups();
 
@@ -240,8 +280,8 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should still sweep local .tmp files, which only ever exist on the staging disk', async () => {
-        staging.list.mockResolvedValue(listing('immich-db-backup-123.sql.gz.tmp'));
-        remote.list.mockResolvedValue([]);
+        staging.seed(...listing('immich-db-backup-123.sql.gz.tmp').map(({ key }) => key));
+        remote.held.clear();
 
         await sut.cleanupDatabaseBackups();
 
@@ -250,8 +290,8 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should leave a restore point alone: it is local by design and never promoted', async () => {
-        staging.list.mockResolvedValue(listing('restore-point-immich-db-backup-1.sql.gz'));
-        remote.list.mockResolvedValue([]);
+        staging.seed(...listing('restore-point-immich-db-backup-1.sql.gz').map(({ key }) => key));
+        remote.held.clear();
 
         await sut.cleanupDatabaseBackups();
 
@@ -394,22 +434,44 @@ describe(DatabaseBackupService.name, () => {
     describe('with S3 configured', () => {
       beforeEach(() => {
         enableRemote();
-        staging.list.mockResolvedValue([]);
-        remote.list.mockResolvedValue([]);
+        staging.held.clear();
+        remote.held.clear();
       });
 
       // The dump is a valid local backup on its own and the upload is retryable, so promoting is the
       // retention pass's job. Doing it here would let an upload failure escape handleBackupDatabase and
       // skip cleanup entirely, stopping retention for as long as the bucket stayed unwritable.
       it('should not upload from the dump path itself', async () => {
-        await expect(sut.handleBackupDatabase()).resolves.toBe(JobStatus.Success);
+        await sut.createDatabaseBackup();
 
         expect(staging.rename).toHaveBeenCalled();
         expect(remote.put).not.toHaveBeenCalled();
       });
 
+      // The whole scheduled flow end to end, which only the stateful fakes make testable: dump to a
+      // .tmp key, rename, upload under the same key, and leave nothing behind on the staging disk.
+      it('should dump, promote and leave the staging disk empty over a whole job', async () => {
+        await expect(sut.handleBackupDatabase()).resolves.toBe(JobStatus.Success);
+
+        const uploaded = remote.held.keys().toArray();
+        expect(uploaded).toHaveLength(1);
+        expect(uploaded[0]).toMatch(/^backups\/immich-db-backup-.*\.sql\.gz$/);
+        expect(staging.held.keys().toArray()).toEqual([]);
+      });
+
+      it('should leave the dump on the staging disk when the upload fails over a whole job', async () => {
+        remote.put.mockRejectedValue(new Error('AccessDenied'));
+
+        await expect(sut.handleBackupDatabase()).rejects.toThrow(/media/);
+
+        expect(staging.held.keys().toArray()).toEqual([
+          expect.stringMatching(/^backups\/immich-db-backup-.*\.sql\.gz$/),
+        ]);
+        expect(remote.held.keys().toArray()).toEqual([]);
+      });
+
       it('should upload and then delete the local copy during cleanup', async () => {
-        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
+        staging.seed(...listingUnder('backups/')('immich-db-backup-1.sql.gz').map(({ key }) => key));
 
         await sut.cleanupDatabaseBackups();
 
@@ -419,16 +481,17 @@ describe(DatabaseBackupService.name, () => {
         expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
       });
 
+      // Regression (review): this previously ran its loop over zero `put` calls and so asserted nothing.
       it('should never upload a .tmp key', async () => {
         await sut.handleBackupDatabase();
 
-        for (const [key] of remote.put.mock.calls) {
-          expect(key).not.toContain('.tmp');
-        }
+        const keys = remote.put.mock.calls.map(([key]) => key);
+        expect(keys).not.toHaveLength(0);
+        expect(keys.filter((key) => key.includes('.tmp'))).toEqual([]);
       });
 
       it('should keep the local file and fail, naming the bucket, when the upload fails', async () => {
-        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
+        staging.seed(...listingUnder('backups/')('immich-db-backup-1.sql.gz').map(({ key }) => key));
         remote.put.mockRejectedValue(new Error('NoSuchBucket'));
 
         await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/media/);
@@ -479,8 +542,39 @@ describe(DatabaseBackupService.name, () => {
         expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz');
       });
 
+      // Regression (review, critical): the remote listing used to be awaited bare at the top of cleanup,
+      // so a bucket that could not be listed threw before anything was pruned or swept — the same
+      // unbounded-growth failure the promote reordering was meant to prevent.
+      it('should still prune and sweep when the bucket cannot be listed', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
+        staging.seed(
+          'backups/immich-db-backup-1.sql.gz',
+          'backups/immich-db-backup-2.sql.gz',
+          'backups/immich-db-backup-3.sql.gz.tmp',
+        );
+        remote.list.mockRejectedValue(new Error('ECONNREFUSED'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow();
+
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
+        expect(mocks.logger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Could not list database backups in S3'),
+        );
+      });
+
+      it('should keep the underlying S3 error as the cause of the reported failure', async () => {
+        staging.seed('backups/immich-db-backup-1.sql.gz');
+        const cause = new Error('AccessDenied: bucket policy');
+        remote.put.mockRejectedValue(cause);
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(
+          expect.objectContaining({ cause: expect.objectContaining({ cause }) }) as never,
+        );
+      });
+
       it('should still succeed when the local delete fails after a good upload', async () => {
-        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
+        staging.seed(...listingUnder('backups/')('immich-db-backup-1.sql.gz').map(({ key }) => key));
         staging.delete.mockRejectedValue(new Error('EBUSY'));
 
         await expect(sut.cleanupDatabaseBackups()).resolves.toBeUndefined();
@@ -490,7 +584,7 @@ describe(DatabaseBackupService.name, () => {
       // Regression (review, low): the straggler loop only considered routine names, so an admin upload
       // whose own promote failed stayed host-only for ever.
       it('should retry an uploaded- backup whose promote failed earlier', async () => {
-        staging.list.mockResolvedValue(listingUnder('backups/')('uploaded-mine.sql.gz'));
+        staging.seed(...listingUnder('backups/')('uploaded-mine.sql.gz').map(({ key }) => key));
 
         await sut.cleanupDatabaseBackups();
 
@@ -498,7 +592,7 @@ describe(DatabaseBackupService.name, () => {
       });
 
       it('should never promote a restore point, which the restore flow needs locally', async () => {
-        staging.list.mockResolvedValue(listingUnder('backups/')('restore-point-immich-db-backup-1.sql.gz'));
+        staging.seed(...listingUnder('backups/')('restore-point-immich-db-backup-1.sql.gz').map(({ key }) => key));
 
         await sut.cleanupDatabaseBackups();
 
@@ -888,12 +982,14 @@ describe(DatabaseBackupService.name, () => {
     });
 
     it('should serve a local backup as a file response', async () => {
+      staging.seed('backups/hello.sql.gz');
       await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(
         expect.objectContaining({ path: '/data/backups/hello.sql.gz', contentType: 'application/gzip' }),
       );
     });
 
     it('should serve an uncompressed backup as plain sql', async () => {
+      staging.seed('backups/hello.sql');
       await expect(sut.downloadBackup('hello.sql')).resolves.toEqual(
         expect.objectContaining({ contentType: 'application/sql' }),
       );
@@ -901,7 +997,7 @@ describe(DatabaseBackupService.name, () => {
 
     it('should serve from S3 once the local copy has been promoted away', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(false);
+      remote.seed('backups/hello.sql.gz');
       remote.getServeStrategy.mockResolvedValue({ type: 'redirect', url: 'https://s3/presigned' } as never);
 
       await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(
@@ -912,7 +1008,7 @@ describe(DatabaseBackupService.name, () => {
 
     it('should relay a proxied S3 read as a stream response', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(false);
+      remote.seed('backups/hello.sql.gz');
       const stream = Readable.from(['payload']);
       remote.getServeStrategy.mockResolvedValue({ type: 'stream', stream, length: 7 } as never);
 
@@ -921,6 +1017,8 @@ describe(DatabaseBackupService.name, () => {
 
     it('should prefer the local copy of a backup that is in both places', async () => {
       enableRemote();
+      staging.seed('backups/hello.sql.gz');
+      remote.seed('backups/hello.sql.gz');
 
       await sut.downloadBackup('hello.sql.gz');
 
@@ -930,8 +1028,6 @@ describe(DatabaseBackupService.name, () => {
 
     it('should 404 a backup that is in neither place', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(false);
-      remote.exists.mockResolvedValue(false);
 
       await expect(sut.downloadBackup('hello.sql.gz')).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -1051,6 +1147,8 @@ describe(DatabaseBackupService.name, () => {
       mocks.process.fork.mockImplementation(() => mockSpawn(0, 'Immich Server is listening', ''));
       mocks.storage.createGzip.mockReturnValue(new PassThrough());
       mocks.storage.createGunzip.mockReturnValue(new PassThrough());
+      // every restore test restores one of these two, so both exist on the staging disk
+      staging.seed('backups/development-filename.sql', 'backups/development-v2.4.0-.sql');
 
       const configMock = {
         getEnv: () => ({
@@ -1292,7 +1390,8 @@ describe(DatabaseBackupService.name, () => {
     // in the bucket, and restoring reads it straight from there with no separate download step.
     it('should restore a backup that only exists in S3', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(false);
+      staging.held.delete('backups/development-filename.sql');
+      remote.seed('backups/development-filename.sql');
       mocks.user.hasAdmin.mockResolvedValue(true);
 
       await sut.restoreDatabaseBackup('development-filename.sql');
@@ -1303,15 +1402,13 @@ describe(DatabaseBackupService.name, () => {
 
     it('should reject a backup that is in neither place', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(false);
-      remote.exists.mockResolvedValue(false);
+      staging.held.clear();
 
       await expect(sut.restoreDatabaseBackup('development-filename.sql')).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('should read the rollback restore point from the staging disk, never from S3', async () => {
       enableRemote();
-      staging.exists.mockResolvedValue(true);
       mocks.user.hasAdmin.mockResolvedValue(false);
 
       await expect(sut.restoreDatabaseBackup('development-filename.sql')).rejects.toThrow('no admin exists');

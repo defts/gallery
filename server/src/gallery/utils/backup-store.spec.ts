@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { MaintenanceModule } from 'src/app.module.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageConfig } from 'src/backends/s3-storage.backend.js';
+import { StorageCore } from 'src/cores/storage.core.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { StorageFolder } from 'src/enum.js';
 import { BACKUP_PREFIX, BackupStoreResolver, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
@@ -50,6 +51,16 @@ describe('BackupStoreResolver', () => {
     expect(store.staging).toBeInstanceOf(DiskStorageBackend);
     expect(store.key('immich-db-backup-1.sql.gz')).toBe('backups/immich-db-backup-1.sql.gz');
     expect(store.prefix).toBe('backups/');
+  });
+
+  // Nothing else pins the root, and a staging backend built with the wrong media location would resolve
+  // `backups/...` against the process cwd — writing dumps somewhere nothing ever reads or prunes.
+  it('roots the staging backend at the media location', async () => {
+    const store = await sut.resolve();
+
+    await expect(store.staging.getReadableUrl('backups/one.sql.gz')).resolves.toBe(
+      `${StorageCore.getMediaLocation()}/backups/one.sql.gz`,
+    );
   });
 
   // The fixed prefix is the whole separation guarantee: `backups` is StorageFolder.Backups, and every media

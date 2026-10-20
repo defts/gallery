@@ -346,10 +346,14 @@ export class DatabaseBackupService {
 
     const key = store.key(filename);
 
+    let source: Readable | undefined;
     try {
-      const { stream } = await store.staging.get(key);
-      await remote.backend.put(key, stream, { contentType: backupContentType(filename) });
+      ({ stream: source } = await store.staging.get(key));
+      await remote.backend.put(key, source, { contentType: backupContentType(filename) });
     } catch (error) {
+      // The upload may have failed before it consumed the read, so the file descriptor behind it is
+      // still open. Every cron tick retries, so leaking one per failure eventually exhausts the process.
+      source?.destroy();
       throw new Error(
         `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}). The backup is still on local disk and the next run will retry the upload.`,
         { cause: error },
@@ -518,13 +522,32 @@ export class DatabaseBackupService {
 
     const localNames = () => this.filenamesIn(store.staging, store.prefix);
     const promoteFailures: string[] = [];
+    const failures: unknown[] = [];
+
+    // Reading the bucket must not be able to abort the pass: a listing that fails for the same reason an
+    // upload would (credentials, network, a bucket policy) would otherwise skip the prune and the sweep
+    // entirely, which is exactly the unbounded-growth failure this ordering exists to prevent. An
+    // unreadable bucket means only that nothing can be deduplicated or pruned remotely this run.
+    const remoteNamesOrNone = async (): Promise<string[] | undefined> => {
+      if (!remote) {
+        return undefined;
+      }
+      try {
+        return await this.filenamesIn(remote.backend, store.prefix);
+      } catch (error) {
+        failures.push(error);
+        this.logger.warn(`Could not list database backups in S3 bucket "${remote.bucket}": ${error}`);
+        return undefined;
+      }
+    };
 
     // Promote first, so a backup just written by `createDatabaseBackup` and any straggler an earlier
     // failed upload left behind both reach the bucket. Failures are collected rather than thrown: the
     // prune and the sweep below must still run, or a permanently unwritable bucket would stop retention
     // and fill the staging disk.
-    if (remote) {
-      const remoteNames = new Set(await this.filenamesIn(remote.backend, store.prefix));
+    const knownRemote = await remoteNamesOrNone();
+    if (remote && knownRemote) {
+      const remoteNames = new Set(knownRemote);
       for (const filename of await localNames()) {
         // `uploaded-` backups are promoted too, so an admin upload whose own promote failed is retried;
         // restore points never are.
@@ -540,6 +563,7 @@ export class DatabaseBackupService {
           await this.promoteToRemote(store, filename);
         } catch (error) {
           promoteFailures.push(filename);
+          failures.push(error);
           this.logger.error(String(error));
         }
       }
@@ -548,18 +572,24 @@ export class DatabaseBackupService {
     // Retention applies to every routine backup the admin can see, across both backends, so
     // `keepLastAmount` bounds the total however the uploads are faring. Deleting by filename hits both
     // sides; `delete` is a no-op where the backup is not present.
-    const routine = [
-      ...new Set([...(await localNames()), ...(remote ? await this.filenamesIn(remote.backend, store.prefix) : [])]),
-    ]
+    // The remote half of the union is re-read, since promoting changed it. A failure here is tolerated
+    // the same way: prune what is known rather than nothing at all.
+    const routine = [...new Set([...(await localNames()), ...((await remoteNamesOrNone()) ?? [])])]
       .filter((filename) => isValidDatabaseRoutineBackupName(filename))
       .toSorted()
       .toReversed();
 
     const toDelete = routine.slice(config.keepLastAmount);
     for (const filename of toDelete) {
-      await store.staging.delete(store.key(filename));
-      if (remote) {
-        await remote.backend.delete(store.key(filename));
+      // One backup that refuses to delete must not stop the rest being pruned.
+      try {
+        await store.staging.delete(store.key(filename));
+        if (remote) {
+          await remote.backend.delete(store.key(filename));
+        }
+      } catch (error) {
+        failures.push(error);
+        this.logger.warn(`Could not delete expired database backup ${filename}: ${error}`);
       }
     }
 
@@ -568,16 +598,30 @@ export class DatabaseBackupService {
     const localAfterPrune = await localNames();
     const failedBackups = localAfterPrune.filter((filename) => isFailedDatabaseBackupName(filename));
     for (const filename of failedBackups) {
-      await store.staging.delete(store.key(filename));
+      try {
+        await store.staging.delete(store.key(filename));
+      } catch (error) {
+        failures.push(error);
+        this.logger.warn(`Could not delete failed database backup file ${filename}: ${error}`);
+      }
     }
 
     this.logger.debug(`Database Backup Cleanup Finished, deleted ${toDelete.length + failedBackups.length} backups`);
 
-    // Reported only now that retention has run, so the job still fails and names the bucket.
+    // Reported only now that retention has run, so the job still fails and names the bucket. The first
+    // underlying error is kept as the cause: without it a persistent AccessDenied is indistinguishable
+    // from a DNS failure in the logs, and this is the one place an admin learns the upload is broken.
     if (promoteFailures.length > 0) {
       throw new Error(
         `Failed to upload ${promoteFailures.length} database backup(s) to S3 bucket "${remote?.bucket}": ${promoteFailures.join(', ')}. They are still on local disk and the next run will retry.`,
+        { cause: failures[0] },
       );
+    }
+
+    // Nothing failed to upload, but something else did (a listing, a delete). Surface it so the job is
+    // not reported as a clean success.
+    if (failures.length > 0) {
+      throw new Error(`Database backup cleanup finished with ${failures.length} error(s)`, { cause: failures[0] });
     }
   }
 

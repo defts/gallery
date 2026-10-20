@@ -24,24 +24,27 @@ Each backup is written in stages:
 
 1. `pg_dump` writes a compressed dump to `UPLOAD_LOCATION/backups`, under a temporary name.
 2. The finished file is given its real name, so a dump interrupted half way can never be mistaken for a usable backup.
-3. The file is uploaded to the bucket.
+3. The retention pass uploads it to the bucket — along with any earlier backup still on disk from a failed upload.
 4. The local copy is deleted.
+
+Steps 3 and 4 are part of retention rather than the dump itself, so an unwritable bucket cannot stop old backups being pruned.
 
 This ordering is what makes the failure cases safe:
 
-| What goes wrong        | What happens                                                                                                                                     |
-| :--------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| The dump itself fails  | The temporary file is removed and the job fails, exactly as it does without S3.                                                                  |
-| The upload fails       | **The backup stays on local disk** and the job fails with the bucket named in the error. Nothing is lost, and the next run retries the upload.   |
-| The local delete fails | A warning is logged and the job still succeeds — the backup is safely in the bucket, and the leftover file is cleaned up on the next backup run. |
+| What goes wrong             | What happens                                                                                                                                        |
+| :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The dump itself fails       | The temporary file is removed and the job fails, exactly as it does without S3.                                                                     |
+| The upload fails            | **The backup stays on local disk**, retention still runs, and the job then fails with the bucket named. Nothing is lost, and the next run retries.  |
+| The local delete fails      | A warning is logged and the job still succeeds — the backup is safely in the bucket, and the leftover file is cleaned up on the next backup run.    |
+| The bucket cannot be listed | A warning is logged; retention still prunes what it can see, and the backup list falls back to the local one so it cannot hide a restorable backup. |
 
 So a wrong bucket name or an expired key leaves you with exactly the local-only behaviour you had before, not with no backups at all.
 
 ## Retention, downloads and restores
 
-- **Retention** (`Keep last amount`) applies to the backup objects under `backups/`. Any local file left behind by a failed upload is retried rather than counted or pruned.
+- **Retention** (`Keep last amount`) applies to every backup you can see, counting the bucket and the server's disk together, so the total is bounded however the uploads are faring. A file left behind by a failed upload is retried first; if it is still outside the newest `Keep last amount` after that, it is pruned like any other.
 - **The backup list** merges both places, so during an outage you still see one coherent set.
-- **Downloading** a backup serves it from wherever it is. With `IMMICH_S3_SERVE_MODE=redirect` (the default) your browser is redirected to a short-lived presigned URL; in `proxy` mode the server streams it to you.
+- **Downloading** a backup serves it from wherever it is, always streamed through the server. Unlike your media, backups ignore `IMMICH_S3_SERVE_MODE`: a presigned redirect would let anyone holding that URL fetch the whole dump with no Immich session, and a dump contains every user's password hash and session tokens.
 - **Restoring** reads straight from the bucket, so a backup that has already been uploaded can be restored without downloading it first. The automatic restore point Gallery takes before a restore is always kept on local disk, since it exists to recover a restore that goes wrong.
 - **Uploading** a backup through the admin UI follows the same staged path and ends up in the bucket.
 
