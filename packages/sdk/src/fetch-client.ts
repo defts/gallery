@@ -57,8 +57,6 @@ export type ActivityStatisticsResponseDto = {
 export type AdminConfigDatabaseBackupS3Dto = {
     /** Upload scheduled database backups to S3 */
     enabled?: boolean;
-    /** Key prefix for database backup objects */
-    prefix: string;
 };
 export type AdminConfigDatabaseBackupDto = {
     /** Cron expression */

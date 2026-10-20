@@ -37,9 +37,7 @@ const listingUnder =
     filenames.map((filename) => ({ key: `${prefix}${filename}`, size: 1 }));
 
 const configWithS3 = (enabled: boolean) =>
-  ({
-    backup: { database: { ...defaults.backup.database, s3: { enabled, prefix: 'immich-db-backups/' } } },
-  }) as SystemConfig;
+  ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
 describe(DatabaseBackupService.name, () => {
   let sut: DatabaseBackupService;
@@ -52,14 +50,14 @@ describe(DatabaseBackupService.name, () => {
 
   /** Turns the remote on for a test, as a configured S3 bucket would. */
   const enableRemote = () => {
-    store.remote = { backend: remote as never, bucket: 'db-backups', key: (filename) => `nightly/${filename}` };
+    store.remote = { backend: remote as never, bucket: 'media' };
   };
 
   beforeEach(() => {
     mocks = getMocks();
     staging = fakeBackend();
     remote = fakeBackend();
-    store = { staging: staging as never, stagingKey: (filename) => `backups/${filename}` };
+    store = { staging: staging as never, key: (filename) => `backups/${filename}`, prefix: 'backups/' };
     resolver = { resolve: () => Promise.resolve(store) };
     maintenanceHealthRepositoryMock = automock(MaintenanceHealthRepository, {
       args: [mocks.logger],
@@ -147,7 +145,7 @@ describe(DatabaseBackupService.name, () => {
 
   describe('cleanupDatabaseBackups', () => {
     const listing = listingUnder('backups/');
-    const remoteListing = listingUnder('nightly/');
+    const remoteListing = listingUnder('backups/');
 
     beforeEach(() => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
@@ -216,7 +214,7 @@ describe(DatabaseBackupService.name, () => {
         await sut.cleanupDatabaseBackups();
 
         expect(remote.delete).toHaveBeenCalledTimes(1);
-        expect(remote.delete).toHaveBeenCalledWith('nightly/immich-db-backup-1.sql.gz');
+        expect(remote.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
       });
 
       it('should promote a straggler left by a failed upload rather than orphaning it', async () => {
@@ -225,7 +223,7 @@ describe(DatabaseBackupService.name, () => {
 
         await sut.cleanupDatabaseBackups();
 
-        expect(remote.put).toHaveBeenCalledWith('nightly/immich-db-backup-1.sql.gz', expect.anything(), {
+        expect(remote.put).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz', expect.anything(), {
           contentType: 'application/gzip',
         });
         expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
@@ -406,7 +404,7 @@ describe(DatabaseBackupService.name, () => {
         expect(result).toBe(JobStatus.Success);
         const [backupKey] = staging.rename.mock.calls[0].slice(1);
         const filename = backupKey.replace('backups/', '');
-        expect(remote.put).toHaveBeenCalledWith(`nightly/${filename}`, expect.anything(), {
+        expect(remote.put).toHaveBeenCalledWith(`backups/${filename}`, expect.anything(), {
           contentType: 'application/gzip',
         });
         expect(staging.delete).toHaveBeenCalledWith(backupKey);
@@ -423,7 +421,7 @@ describe(DatabaseBackupService.name, () => {
       it('should keep the local file and fail the job when the upload fails, naming the bucket', async () => {
         remote.put.mockRejectedValue(new Error('NoSuchBucket'));
 
-        await expect(sut.handleBackupDatabase()).rejects.toThrow(/db-backups/);
+        await expect(sut.handleBackupDatabase()).rejects.toThrow(/media/);
 
         const [, backupKey] = staging.rename.mock.calls[0];
         expect(staging.delete).not.toHaveBeenCalledWith(backupKey);
@@ -810,7 +808,7 @@ describe(DatabaseBackupService.name, () => {
     it('should promote an uploaded backup to S3 like any other', async () => {
       enableRemote();
       await sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never);
-      expect(remote.put).toBeCalledWith('nightly/uploaded-path.sql.gz', expect.anything(), {
+      expect(remote.put).toBeCalledWith('backups/uploaded-path.sql.gz', expect.anything(), {
         contentType: 'application/gzip',
       });
       expect(staging.delete).toBeCalledWith('backups/uploaded-path.sql.gz');
@@ -844,7 +842,7 @@ describe(DatabaseBackupService.name, () => {
       await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(
         expect.objectContaining({ url: 'https://s3/presigned' }),
       );
-      expect(remote.getServeStrategy).toHaveBeenCalledWith('nightly/hello.sql.gz', expect.anything());
+      expect(remote.getServeStrategy).toHaveBeenCalledWith('backups/hello.sql.gz', expect.anything());
     });
 
     it('should relay a proxied S3 read as a stream response', async () => {
@@ -903,9 +901,11 @@ describe(DatabaseBackupService.name, () => {
 
     it('should union both backends, deduplicated by filename', async () => {
       enableRemote();
+      // the usual steady state with S3 on: everything promoted lives only in the bucket, and anything
+      // still on disk is a straggler from a failed upload
       remote.list.mockResolvedValue([
-        { key: 'nightly/immich-db-backup-1.sql.gz', size: 10 },
-        { key: 'nightly/immich-db-backup-2.sql.gz', size: 20 },
+        { key: 'backups/immich-db-backup-1.sql.gz', size: 10 },
+        { key: 'backups/immich-db-backup-2.sql.gz', size: 20 },
       ]);
       staging.list.mockResolvedValue([{ key: 'backups/immich-db-backup-3.sql.gz', size: 30 }]);
 
@@ -920,7 +920,7 @@ describe(DatabaseBackupService.name, () => {
 
     it('should report the local size for a backup still awaiting its upload', async () => {
       enableRemote();
-      remote.list.mockResolvedValue([{ key: 'nightly/immich-db-backup-1.sql.gz', size: 10 }]);
+      remote.list.mockResolvedValue([{ key: 'backups/immich-db-backup-1.sql.gz', size: 10 }]);
       staging.list.mockResolvedValue([{ key: 'backups/immich-db-backup-1.sql.gz', size: 99 }]);
 
       await expect(sut.listBackups()).resolves.toMatchObject({
@@ -930,7 +930,7 @@ describe(DatabaseBackupService.name, () => {
 
     it('should ignore objects under the prefix that are not backups', async () => {
       enableRemote();
-      remote.list.mockResolvedValue([{ key: 'nightly/notes.txt', size: 5 }]);
+      remote.list.mockResolvedValue([{ key: 'backups/notes.txt', size: 5 }]);
 
       await expect(sut.listBackups()).resolves.toEqual({ backups: [] });
     });
@@ -953,7 +953,7 @@ describe(DatabaseBackupService.name, () => {
       enableRemote();
       await sut.deleteBackup(['filename.sql']);
       expect(staging.delete).toHaveBeenCalledWith('backups/filename.sql');
-      expect(remote.delete).toHaveBeenCalledWith('nightly/filename.sql');
+      expect(remote.delete).toHaveBeenCalledWith('backups/filename.sql');
     });
   });
 
@@ -1210,7 +1210,7 @@ describe(DatabaseBackupService.name, () => {
 
       await sut.restoreDatabaseBackup('development-filename.sql');
 
-      expect(remote.get).toHaveBeenCalledWith('nightly/development-filename.sql');
+      expect(remote.get).toHaveBeenCalledWith('backups/development-filename.sql');
       expect(maintenanceHealthRepositoryMock.checkApiHealth).toHaveBeenCalled();
     });
 

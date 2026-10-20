@@ -12,8 +12,9 @@ This option only appears when the server is started with `IMMICH_STORAGE_BACKEND
 
 1. Go to **Administration > Settings > Backup Settings**.
 2. Turn on **Upload backups to S3**.
-3. Set a **Backup key prefix** — the folder inside the bucket that backup objects are written to. The default is `immich-db-backups/`. It cannot be empty: backups share the bucket with your media, and the prefix is what keeps them separate. Scope any S3 lifecycle rules you want for backups to this prefix.
-4. Save.
+3. Save.
+
+That is the whole setting. Backups go to the same bucket as your media, under `backups/` — the same folder name they use on disk, and one no media file can occupy, since media is written under `upload/`, `library/`, `thumbs/`, `encoded-video/` and `profile/`. If you want S3 lifecycle rules just for your backups, scope them to the `backups/` prefix.
 
 The next scheduled or manual backup is uploaded. From then on, **Administration > Settings > Backup Settings** and the restore picker list the backups in your bucket.
 
@@ -38,7 +39,7 @@ So a wrong bucket name or an expired key leaves you with exactly the local-only 
 
 ## Retention, downloads and restores
 
-- **Retention** (`Keep last amount`) applies to the backup objects under your prefix. Any local file left behind by a failed upload is retried rather than counted or pruned.
+- **Retention** (`Keep last amount`) applies to the backup objects under `backups/`. Any local file left behind by a failed upload is retried rather than counted or pruned.
 - **The backup list** merges both places, so during an outage you still see one coherent set.
 - **Downloading** a backup serves it from wherever it is. With `IMMICH_S3_SERVE_MODE=redirect` (the default) your browser is redirected to a short-lived presigned URL; in `proxy` mode the server streams it to you.
 - **Restoring** reads straight from the bucket, so a backup that has already been uploaded can be restored without downloading it first. The automatic restore point Gallery takes before a restore is always kept on local disk, since it exists to recover a restore that goes wrong.

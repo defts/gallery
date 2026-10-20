@@ -271,7 +271,7 @@ export class DatabaseBackupService {
 
     const filename = `${filenamePrefix}immich-db-backup-${DateTime.now().toFormat("yyyyLLdd'T'HHmmss")}-v${serverVersion.toString()}-pg${databaseVersion.split(' ', 1)[0]}.sql.gz`;
     const store = await this.backupStore.resolve();
-    const backupKey = store.stagingKey(filename);
+    const backupKey = store.key(filename);
     const temporaryKey = `${backupKey}.tmp`;
 
     let pgdump: Duplex | undefined;
@@ -333,23 +333,22 @@ export class DatabaseBackupService {
       return;
     }
 
-    const stagingKey = store.stagingKey(filename);
-    const remoteKey = remote.key(filename);
+    const key = store.key(filename);
 
     try {
-      const { stream } = await store.staging.get(stagingKey);
-      await remote.backend.put(remoteKey, stream, { contentType: backupContentType(filename) });
+      const { stream } = await store.staging.get(key);
+      await remote.backend.put(key, stream, { contentType: backupContentType(filename) });
     } catch (error) {
       throw new Error(
-        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${remoteKey}). The backup is still on local disk and the next run will retry the upload.`,
+        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}). The backup is still on local disk and the next run will retry the upload.`,
         { cause: error },
       );
     }
 
-    this.logger.log(`Database Backup uploaded to S3 (bucket: ${remote.bucket}, key: ${remoteKey})`);
+    this.logger.log(`Database Backup uploaded to S3 (bucket: ${remote.bucket}, key: ${key})`);
 
     await store.staging
-      .delete(stagingKey)
+      .delete(key)
       .catch((error) => this.logger.warn(`Uploaded ${filename} to S3 but failed to delete the local copy: ${error}`));
   }
 
@@ -364,16 +363,13 @@ export class DatabaseBackupService {
    * and restorable from there; everything else has been promoted and only exists in the bucket.
    */
   private async locate(store: BackupStore, filename: string): Promise<{ backend: StorageBackend; key: string }> {
-    const stagingKey = store.stagingKey(filename);
-    if (await store.staging.exists(stagingKey)) {
-      return { backend: store.staging, key: stagingKey };
+    const key = store.key(filename);
+    if (await store.staging.exists(key)) {
+      return { backend: store.staging, key };
     }
 
-    if (store.remote) {
-      const remoteKey = store.remote.key(filename);
-      if (await store.remote.backend.exists(remoteKey)) {
-        return { backend: store.remote.backend, key: remoteKey };
-      }
+    if (store.remote && (await store.remote.backend.exists(key))) {
+      return { backend: store.remote.backend, key };
     }
 
     throw new NotFoundException(`Backup ${filename} was not found`);
@@ -387,7 +383,7 @@ export class DatabaseBackupService {
 
     const filename = `uploaded-${fn}`;
     const store = await this.backupStore.resolve();
-    await store.staging.put(store.stagingKey(filename), file.buffer, { contentType: backupContentType(filename) });
+    await store.staging.put(store.key(filename), file.buffer, { contentType: backupContentType(filename) });
     await this.promoteToRemote(store, filename);
   }
 
@@ -440,12 +436,12 @@ export class DatabaseBackupService {
     // set. Local is read last and wins: during a failed upload it is the copy an admin can download.
     const sizes = new Map<string, number>();
     if (store.remote) {
-      const remoteEntries = await store.remote.backend.list(store.remote.key(''));
+      const remoteEntries = await store.remote.backend.list(store.prefix);
       for (const { key, size } of remoteEntries) {
         sizes.set(basename(key), size);
       }
     }
-    const localEntries = await store.staging.list(store.stagingKey(''));
+    const localEntries = await store.staging.list(store.prefix);
     for (const { key, size } of localEntries) {
       sizes.set(basename(key), size);
     }
@@ -474,10 +470,10 @@ export class DatabaseBackupService {
     // Delete from wherever it is. The local copy is normally already gone once promoted, and
     // `delete` is a no-op on a missing disk file, so both sides are safe to attempt.
     await Promise.all(
-      files.flatMap((filename) => [
-        store.staging.delete(store.stagingKey(filename)),
-        ...(remote ? [remote.backend.delete(remote.key(filename))] : []),
-      ]),
+      files.flatMap((filename) => {
+        const key = store.key(filename);
+        return [store.staging.delete(key), ...(remote ? [remote.backend.delete(key)] : [])];
+      }),
     );
   }
 
@@ -490,18 +486,18 @@ export class DatabaseBackupService {
     const store = await this.backupStore.resolve();
     const { remote } = store;
 
-    const localNames = () => this.filenamesIn(store.staging, store.stagingKey(''));
+    const localNames = () => this.filenamesIn(store.staging, store.prefix);
 
     // Retry stragglers first: a backup left on disk by a failed upload is promoted rather than
     // orphaned, and a local copy that is already in the bucket is just a duplicate.
     if (remote) {
-      const remoteNames = new Set(await this.filenamesIn(remote.backend, remote.key('')));
+      const remoteNames = new Set(await this.filenamesIn(remote.backend, store.prefix));
       for (const filename of await localNames()) {
         if (!isValidDatabaseRoutineBackupName(filename)) {
           continue;
         }
         if (remoteNames.has(filename)) {
-          await store.staging.delete(store.stagingKey(filename));
+          await store.staging.delete(store.key(filename));
           continue;
         }
         await this.promoteToRemote(store, filename);
@@ -512,12 +508,12 @@ export class DatabaseBackupService {
     // S3 is on would delete a straggler the next run could still promote.
     const canonical = remote
       ? {
-          list: () => this.filenamesIn(remote.backend, remote.key('')),
-          delete: (filename: string) => remote.backend.delete(remote.key(filename)),
+          list: () => this.filenamesIn(remote.backend, store.prefix),
+          delete: (filename: string) => remote.backend.delete(store.key(filename)),
         }
       : {
           list: localNames,
-          delete: (filename: string) => store.staging.delete(store.stagingKey(filename)),
+          delete: (filename: string) => store.staging.delete(store.key(filename)),
         };
 
     const canonicalNames = await canonical.list();
@@ -536,7 +532,7 @@ export class DatabaseBackupService {
     const localNamesAfterPromote = await localNames();
     const failedBackups = localNamesAfterPromote.filter((filename) => isFailedDatabaseBackupName(filename));
     for (const filename of failedBackups) {
-      await store.staging.delete(store.stagingKey(filename));
+      await store.staging.delete(store.key(filename));
     }
 
     this.logger.debug(`Database Backup Cleanup Finished, deleted ${toDelete.length + failedBackups.length} backups`);
@@ -620,7 +616,7 @@ export class DatabaseBackupService {
         progressCb?.('rollback', 0);
 
         // the restore point is never promoted, so it is always on the staging disk
-        const { stream: restorePointStream } = await store.staging.get(store.stagingKey(restorePointFilename));
+        const { stream: restorePointStream } = await store.staging.get(store.key(restorePointFilename));
         const gunzip = this.storageRepository.createGunzip();
         restorePointStream.pipe(gunzip);
         inputStream = gunzip;

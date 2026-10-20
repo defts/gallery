@@ -72,9 +72,10 @@
           isEdited={configToEdit.backup.database.keepLastAmount !== config.backup.database.keepLastAmount}
         />
 
-        <!-- Gallery-fork: offered only on the S3 storage backend, which is where the credentials,
-             region and endpoint these objects are written with already come from. The whole group is
-             absent rather than disabled when it cannot apply. -->
+        <!-- Gallery-fork: offered only on the S3 storage backend, which is where the bucket, credentials,
+             region and endpoint these objects are written with come from; the key prefix is fixed at
+             `backups/`. There is nothing to configure beyond the switch, and the group is absent rather
+             than disabled when it cannot apply. -->
         {#if featureFlagsManager.value.s3Storage}
           <hr />
 
@@ -86,16 +87,6 @@
           />
 
           <Text size="small" color="muted">{$t('admin.backup_s3_credentials_hint')}</Text>
-
-          <SettingInputField
-            inputType={SettingInputFieldType.TEXT}
-            required={true}
-            label={$t('admin.backup_s3_prefix')}
-            description={$t('admin.backup_s3_prefix_description')}
-            disabled={disabled || !configToEdit.backup.database.s3.enabled}
-            bind:value={configToEdit.backup.database.s3.prefix}
-            isEdited={configToEdit.backup.database.s3.prefix !== config.backup.database.s3.prefix}
-          />
         {/if}
 
         <SettingButtonsRow {disabled} bind:configToEdit keys={['backup']} />

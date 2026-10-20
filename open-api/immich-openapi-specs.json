@@ -27455,15 +27455,8 @@
           "enabled": {
             "description": "Upload scheduled database backups to S3",
             "type": "boolean"
-          },
-          "prefix": {
-            "description": "Key prefix for database backup objects",
-            "type": "string"
           }
         },
-        "required": [
-          "prefix"
-        ],
         "type": "object"
       },
       "AdminConfigDto": {

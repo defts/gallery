@@ -15,10 +15,10 @@ S3 → on success delete the local copy.
 The feature is offered only when the server's storage backend is already S3 (`IMMICH_STORAGE_BACKEND=s3`), with an
 enable/disable flag in Admin → System Settings → Backup that is absent otherwise. Because an S3 backend is already
 constructed and credentialed when it applies, the feature reuses the existing `IMMICH_S3_*` bucket, credentials,
-region and endpoint: no new environment variables, no secrets in the database, and nothing new that
-`GET /admin/config` would hand back in the clear (it redacts nothing today —
-`notifications.smtp.transport.password` and `oauth.clientSecret` both come back as stored). The admin is left with
-the two things that are genuinely a choice: on/off, and where in the bucket the dumps land.
+region and endpoint, and writes under the `backups/` prefix: no new environment variables, nothing about the
+destination in the database, and nothing new that `GET /admin/config` would hand back in the clear (it redacts
+nothing today — `notifications.smtp.transport.password` and `oauth.clientSecret` both come back as stored). The
+admin is left with a single switch.
 
 ## Decisions
 
@@ -33,21 +33,23 @@ the two things that are genuinely a choice: on/off, and where in the bucket the 
 - **Gated on the env storage backend being S3.** That gate is what keeps the feature small: it is the reason no
   credentials, region or endpoint belong in the saved config. Letting backups go to S3 while media stays on disk is
   out of scope, and lifting the gate is what would bring back a bucket/region/endpoint/credentials block of its own.
-- **Two config fields only:** `backup.database.s3 = { enabled, prefix }`. An earlier draft allowed a separate
-  bucket, on the grounds that backups want their own lifecycle rules and access policy. The owner removed it: the
-  gate already guarantees the server is credentialed for exactly one bucket, so a second bucket field is a way to
-  configure a destination the server cannot necessarily write to, and the failure would only surface at backup
-  time. Lifecycle rules can be scoped to the prefix instead.
-- **The prefix is therefore required and may not be empty.** It is the only thing separating dumps from the media
-  key space, and an empty prefix would also make every listing (retention, the backup list, restore) enumerate the
-  entire media bucket. `ConfigValidate` rejects a blank prefix while the flag is on, and the resolver independently
-  falls back to `DEFAULT_BACKUP_PREFIX` for any config that predates the guard or arrives through
-  `IMMICH_CONFIG_FILE`.
+- **One config field:** `backup.database.s3 = { enabled }`. Earlier drafts had a configurable bucket and then a
+  configurable prefix. The owner removed both. The bucket went first: the gate already guarantees the server is
+  credentialed for exactly one bucket, so a bucket field only let an admin name a destination the server might not
+  be able to write to, and the failure would surface at backup time. The prefix went next, for the stronger
+  reason below.
+- **The prefix is fixed at `backups/`** (`BACKUP_PREFIX`), which is `StorageFolder.Backups` — the folder upstream
+  already reserves for backups under the media location. Every media key is namespaced by one of the other five
+  `StorageFolder` values (`upload/`, `library/`, `thumbs/`, `encoded-video/`, `profile/`), so sharing the media
+  bucket **cannot** collide with media, and the bucket ends up mirroring the on-disk layout. Fixing it is what
+  makes that a guarantee rather than a convention an admin can break: a configurable prefix could be set empty,
+  which would scatter dumps through the media key space and make every listing (retention, the backup list,
+  restore) enumerate the entire bucket. With it fixed there is no such state to validate against, and the staging
+  and remote keys are the same string.
 - **Off by default** (`enabled: false`), so a fresh install behaves exactly like upstream Immich.
-- **Two independent key spaces.** The staging key is `backups/<filename>`, which `DiskStorageBackend` resolves under
-  the media location; the remote key is `<prefix><filename>`. One shared key would have put the admin's prefix
-  under a `backups/` folder that only means anything on disk, or required prefix support inside
-  `S3StorageBackend`, which media does not need.
+- **One key space.** `backups/<filename>` on both backends: `DiskStorageBackend` resolves it under the media
+  location, and it is the S3 object key verbatim. A promote therefore copies a key rather than translating one, and
+  `S3StorageBackend` needs no prefix support of its own (media does not use any).
 - **`list(prefix)` is the only addition to `StorageBackend`.** `rename` is added to `DiskStorageBackend` alone,
   because S3 has no move — only a copy-then-delete that is neither atomic nor cheap for a multi-gigabyte object —
   and the single caller only ever moves a file on the staging disk.
@@ -65,13 +67,9 @@ the two things that are genuinely a choice: on/off, and where in the bucket the 
 // server/src/gallery/utils/backup-store.ts
 export interface BackupStore {
   staging: DiskStorageBackend; // always the disk backend — where pg_dump writes
-  stagingKey: (filename: string) => string; // `backups/<filename>`
-  remote?: {
-    // present only when the gate below is satisfied
-    backend: StorageBackend;
-    bucket: string;
-    key: (filename: string) => string; // `<prefix><filename>`
-  };
+  remote?: { backend: StorageBackend; bucket: string }; // only when the gate below is satisfied
+  key: (filename: string) => string; // `backups/<filename>`, on either backend
+  prefix: string; // BACKUP_PREFIX, for listings
 }
 ```
 
@@ -79,20 +77,21 @@ export interface BackupStore {
 needs its disk-only `rename`.
 
 `BackupStoreResolver.resolve()` reads the saved config fresh on every call, so an admin edit applies without
-restarting the server. Only the S3 client is cached, keyed on bucket, region, endpoint, access key id and prefix,
-and rebuilt when any of those change. It is a Nest provider (registered in `galleryServices`) rather than a static,
+restarting the server. Only the S3 client is cached, keyed on bucket, region, endpoint and access key id, and
+rebuilt when any of those change. It is a Nest provider (registered in `galleryServices`) rather than a static,
 so the backup service can be given a stub and the client is owned by something with a lifecycle.
 
 **The gate.** `remote` is set only when all of: the env storage backend is `s3`, `backup.database.s3.enabled` is
 on, and `IMMICH_S3_BUCKET` is set. The S3 backend is built from `envData.storage.s3` verbatim — nothing about the
-destination comes from the saved config except the prefix. A failed gate degrades to local-only with a warning
+destination comes from the saved config at all. A failed gate degrades to local-only with a warning
 logged once per distinct misconfiguration, so an admin who sets `IMMICH_STORAGE_BACKEND` back to disk still gets
 backups instead of none.
 
 ## 2. What each operation became
 
-Keys are relative throughout. Today's absolute paths always resolved to disk, because `isDiskPath` is
-`isAbsolute`; relative keys are what make one call site work against either backend.
+Keys are relative throughout, and identical on both backends (`backups/<filename>`). Today's absolute paths
+always resolved to disk, because `isDiskPath` is `isAbsolute`; relative keys are what make one call site work
+against either backend, and the fixed prefix is what lets a promote reuse the same key rather than translating it.
 
 | Operation                | Behaviour                                                                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -152,11 +151,11 @@ There was no client-side signal for "the server is running on S3", so one featur
 
 The web wraps the whole S3 group in `{#if featureFlagsManager.value.s3Storage}`, so the section is absent rather
 than disabled when it cannot apply (`AuthSettings.svelte` is the in-repo precedent for `{#if}`-hiding a dependent
-config group). Bucket and prefix are additionally disabled while the toggle is off, and the existing
+config group). The switch is the entire control — there is nothing else to configure — and the existing
 `SettingButtonsRow keys={['backup']}` already covers saving.
 
 Server-side the `ConfigValidate` handler rejects a save that enables S3 backups while the storage backend is not
-S3, or with a blank prefix, so the API cannot be used to reach a state the UI will not show. `DatabaseBackupService` holds the handler but
+S3, so the API cannot be used to reach a state the UI will not show. `DatabaseBackupService` holds the handler but
 delegates to `validateBackupS3Config` in the fork namespace, keeping the upstream file to one call into a fork
 module.
 

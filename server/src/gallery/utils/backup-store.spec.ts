@@ -4,12 +4,8 @@ import { MaintenanceModule } from 'src/app.module.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
-import {
-  BackupStoreResolver,
-  DEFAULT_BACKUP_PREFIX,
-  normalizeBackupPrefix,
-  validateBackupS3Config,
-} from 'src/gallery/utils/backup-store.js';
+import { StorageFolder } from 'src/enum.js';
+import { BACKUP_PREFIX, BackupStoreResolver, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
@@ -32,7 +28,7 @@ describe('BackupStoreResolver', () => {
   let sut: TestBackupStoreResolver;
   let mocks: ServiceMocks;
 
-  const withS3Config = (s3: { enabled?: boolean; prefix?: string }) =>
+  const withS3Config = (s3: { enabled?: boolean }) =>
     mocks.systemMetadata.get.mockResolvedValue({ backup: { database: { s3 } } });
 
   const onS3 = (bucket = 'media') =>
@@ -52,7 +48,21 @@ describe('BackupStoreResolver', () => {
     const store = await sut.resolve();
 
     expect(store.staging).toBeInstanceOf(DiskStorageBackend);
-    expect(store.stagingKey('immich-db-backup-1.sql.gz')).toBe('backups/immich-db-backup-1.sql.gz');
+    expect(store.key('immich-db-backup-1.sql.gz')).toBe('backups/immich-db-backup-1.sql.gz');
+    expect(store.prefix).toBe('backups/');
+  });
+
+  // The fixed prefix is the whole separation guarantee: `backups` is StorageFolder.Backups, and every media
+  // key is namespaced by one of the other five values, so sharing the media bucket cannot collide.
+  it('uses the reserved backups folder as its prefix on both backends', () => {
+    expect(BACKUP_PREFIX).toBe(`${StorageFolder.Backups}/`);
+    expect([
+      StorageFolder.Upload,
+      StorageFolder.Library,
+      StorageFolder.Thumbnails,
+      StorageFolder.EncodedVideo,
+      StorageFolder.Profile,
+    ]).not.toContain(StorageFolder.Backups);
   });
 
   describe('the gate', () => {
@@ -95,13 +105,14 @@ describe('BackupStoreResolver', () => {
     });
 
     it('resolves a remote when the backend is s3, the flag is on and a bucket is configured', async () => {
-      withS3Config({ enabled: true, prefix: 'nightly/' });
+      withS3Config({ enabled: true });
       onS3();
 
       const store = await sut.resolve();
 
       expect(store.remote?.bucket).toBe('media');
-      expect(store.remote?.key('immich-db-backup-1.sql.gz')).toBe('nightly/immich-db-backup-1.sql.gz');
+      // the same key on both backends, so a promote never rewrites it
+      expect(store.key('immich-db-backup-1.sql.gz')).toBe('backups/immich-db-backup-1.sql.gz');
     });
   });
 
@@ -134,7 +145,7 @@ describe('BackupStoreResolver', () => {
     });
 
     it('reuses the client across resolves while the settings are unchanged', async () => {
-      withS3Config({ enabled: true, prefix: 'nightly/' });
+      withS3Config({ enabled: true });
 
       const first = await sut.resolve();
       const second = await sut.resolve();
@@ -143,19 +154,8 @@ describe('BackupStoreResolver', () => {
       expect(second.remote?.backend).toBe(first.remote?.backend);
     });
 
-    it('rebuilds the client when the resolved settings change', async () => {
-      withS3Config({ enabled: true, prefix: 'first/' });
-      await sut.resolve();
-
-      withS3Config({ enabled: true, prefix: 'second/' });
-      const store = await sut.resolve();
-
-      expect(sut.built).toHaveLength(2);
-      expect(store.remote?.key('x.sql.gz')).toBe('second/x.sql.gz');
-    });
-
     it('rebuilds the client when the media bucket changes under it', async () => {
-      withS3Config({ enabled: true, prefix: 'nightly/' });
+      withS3Config({ enabled: true });
       await sut.resolve();
 
       onS3('other-media');
@@ -163,14 +163,6 @@ describe('BackupStoreResolver', () => {
 
       expect(sut.built.map(({ bucket }) => bucket)).toEqual(['media', 'other-media']);
       expect(store.remote?.bucket).toBe('other-media');
-    });
-
-    it('falls back to the default prefix when a stored config has none', async () => {
-      withS3Config({ enabled: true, prefix: '' });
-
-      const store = await sut.resolve();
-
-      expect(store.remote?.key('x.sql.gz')).toBe(`${DEFAULT_BACKUP_PREFIX}x.sql.gz`);
     });
 
     it('reads the config fresh on every resolve, so an admin edit applies without a restart', async () => {
@@ -185,22 +177,8 @@ describe('BackupStoreResolver', () => {
   });
 });
 
-describe('normalizeBackupPrefix', () => {
-  it.each`
-    input                  | expected
-    ${'immich-db-backups'} | ${'immich-db-backups/'}
-    ${'immich/db/'}        | ${'immich/db/'}
-    ${'/leading'}          | ${'leading/'}
-    ${` /padded `}         | ${'padded/'}
-    ${''}                  | ${''}
-    ${' '.repeat(3)}       | ${''}
-  `('normalizes $input to $expected', ({ input, expected }) => {
-    expect(normalizeBackupPrefix(input)).toBe(expected);
-  });
-});
-
-const configWith = (enabled: boolean, prefix = 'immich-db-backups/') =>
-  ({ backup: { database: { ...defaults.backup.database, s3: { enabled, prefix } } } }) as SystemConfig;
+const configWith = (enabled: boolean) =>
+  ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
 describe('validateBackupS3Config', () => {
   it('refuses to enable S3 backups while the storage backend is disk', () => {
@@ -215,18 +193,6 @@ describe('validateBackupS3Config', () => {
 
   it('allows a disk-backed server to leave S3 backups off', () => {
     expect(() => validateBackupS3Config(configWith(false), { storage: { backend: 'disk' } })).not.toThrow();
-  });
-
-  // Backups share the media bucket now that there is no bucket of their own, so an empty prefix would
-  // scatter dumps across the media key space and make every listing enumerate the whole bucket.
-  it.each([[''], [' '.repeat(3)], ['/']])('refuses an empty prefix (%j) while enabled', (prefix) => {
-    expect(() => validateBackupS3Config(configWith(true, prefix), { storage: { backend: 's3' } })).toThrow(
-      /key prefix is required/,
-    );
-  });
-
-  it('ignores an empty prefix while disabled', () => {
-    expect(() => validateBackupS3Config(configWith(false, ''), { storage: { backend: 'disk' } })).not.toThrow();
   });
 });
 
