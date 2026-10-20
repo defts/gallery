@@ -207,8 +207,17 @@ export class S3StorageBackend implements StorageBackend {
     const results: Array<{ key: string; size: number }> = [];
     let continuationToken: string | undefined;
     do {
+      // `Delimiter: '/'` keeps this to the direct children of the prefix, which is what the interface
+      // promises and what the disk backend does. Without it a nested key would be returned whose
+      // filename no longer reconstructs the key, so a caller round-tripping a listing into `delete`
+      // would silently delete nothing. Rolled-up CommonPrefixes are ignored: they are not objects.
       const page = await this.client.send(
-        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: continuationToken }),
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          Delimiter: '/',
+          ContinuationToken: continuationToken,
+        }),
       );
       for (const object of page.Contents ?? []) {
         // S3 has no directories, but a console-created "folder" shows up as a zero-byte key

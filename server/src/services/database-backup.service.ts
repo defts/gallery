@@ -42,6 +42,15 @@ import { handlePromiseError } from 'src/utils/misc.js';
 
 const backupContentType = (filename: string) => (filename.endsWith('.gz') ? 'application/gzip' : 'application/sql');
 
+/**
+ * Prefix of the safety backup the restore flow takes before it overwrites the database. These stay on the
+ * staging disk: they exist to recover a restore that goes wrong, so they must not depend on the same remote
+ * the restore may be reading from. Upstream never prunes them either.
+ */
+const RESTORE_POINT_PREFIX = 'restore-point-';
+
+const isRestorePoint = (filename: string) => filename.startsWith(RESTORE_POINT_PREFIX);
+
 @Injectable()
 export class DatabaseBackupService {
   constructor(
@@ -79,8 +88,8 @@ export class DatabaseBackupService {
   }
 
   @OnEvent({ name: 'ConfigValidate' })
-  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
-    validateBackupS3Config(newConfig, this.configRepository.getEnv());
+  onConfigValidate({ newConfig, oldConfig }: ArgOf<'ConfigValidate'>) {
+    validateBackupS3Config(newConfig, oldConfig, this.configRepository.getEnv());
   }
 
   @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
@@ -256,10 +265,10 @@ export class DatabaseBackupService {
   /**
    * Returns the backup's filename, which every other operation here resolves to a backend key.
    *
-   * Staged write: `pg_dump | gzip` lands on the staging disk under a `.tmp` key, the finished file is
-   * promoted to its real name (so a dump killed half way can never be mistaken for a valid backup),
-   * and only then is it uploaded to S3 and the local copy removed. A prefixed backup is a restore
-   * point, which is the restore flow's own local safety net and so is never uploaded.
+   * Staged write: `pg_dump | gzip` lands on the staging disk under a `.tmp` key and the finished file is
+   * then renamed to its real name, so a dump killed half way can never be mistaken for a valid backup.
+   * Uploading it to S3 and removing the local copy is `cleanupDatabaseBackups`' job — see the note at the
+   * end of this method.
    */
   async createDatabaseBackup(filenamePrefix: string = ''): Promise<string> {
     this.logger.debug(`Database Backup Started`);
@@ -313,19 +322,21 @@ export class DatabaseBackupService {
       throw error;
     }
 
-    if (filenamePrefix === '') {
-      await this.promoteToRemote(store, filename);
-    }
-
+    // Deliberately NOT promoted here. The upload is retryable and the dump on disk is already a valid
+    // backup, so promoting is part of the retention pass (`cleanupDatabaseBackups`) instead: throwing from
+    // here would escape `handleBackupDatabase` and skip cleanup altogether, which would stop retention and
+    // leave the staging disk growing without bound for as long as the bucket stayed unwritable.
     this.logger.log(`Database Backup Success`);
     return filename;
   }
 
   /**
-   * The staged promote. An upload failure throws, so the job reports `Failed` with the bucket named and
-   * the local file still in place for the next run to retry; a delete failure after a good upload is
-   * only logged, because the object is safely in S3 and the straggler is swept by the next cleanup.
-   * A no-op when no remote is configured.
+   * The staged promote: stream the finished local file to the bucket, then delete the local copy.
+   *
+   * Throws on upload failure, leaving the local file in place. `cleanupDatabaseBackups` catches that and
+   * carries on so retention still runs; `uploadBackup` lets it reach the admin, who is waiting on the
+   * request. A delete failure after a good upload is only logged, because the object is safely in S3 and
+   * the straggler is swept by the next cleanup. A no-op when no remote is configured.
    */
   private async promoteToRemote(store: BackupStore, filename: string): Promise<void> {
     const { remote } = store;
@@ -434,16 +445,35 @@ export class DatabaseBackupService {
 
     // Union of both backends, deduplicated by filename, so a partial outage still shows one coherent
     // set. Local is read last and wins: during a failed upload it is the copy an admin can download.
+    //
+    // Each side is read independently and a failure on one is only logged, because this list drives both
+    // the admin UI and the maintenance-mode restore picker: an unreachable bucket must not hide the local
+    // backups an admin could still restore from. Only a total failure is reported.
     const sizes = new Map<string, number>();
+    const failures: unknown[] = [];
+
     if (store.remote) {
-      const remoteEntries = await store.remote.backend.list(store.prefix);
-      for (const { key, size } of remoteEntries) {
-        sizes.set(basename(key), size);
+      try {
+        for (const { key, size } of await store.remote.backend.list(store.prefix)) {
+          sizes.set(basename(key), size);
+        }
+      } catch (error) {
+        failures.push(error);
+        this.logger.warn(`Could not list database backups in S3 bucket "${store.remote.bucket}": ${error}`);
       }
     }
-    const localEntries = await store.staging.list(store.prefix);
-    for (const { key, size } of localEntries) {
-      sizes.set(basename(key), size);
+
+    try {
+      for (const { key, size } of await store.staging.list(store.prefix)) {
+        sizes.set(basename(key), size);
+      }
+    } catch (error) {
+      failures.push(error);
+      this.logger.warn(`Could not list database backups on local disk: ${error}`);
+    }
+
+    if (failures.length > 0 && sizes.size === 0) {
+      throw failures[0];
     }
 
     const backups = sizes
@@ -487,55 +517,68 @@ export class DatabaseBackupService {
     const { remote } = store;
 
     const localNames = () => this.filenamesIn(store.staging, store.prefix);
+    const promoteFailures: string[] = [];
 
-    // Retry stragglers first: a backup left on disk by a failed upload is promoted rather than
-    // orphaned, and a local copy that is already in the bucket is just a duplicate.
+    // Promote first, so a backup just written by `createDatabaseBackup` and any straggler an earlier
+    // failed upload left behind both reach the bucket. Failures are collected rather than thrown: the
+    // prune and the sweep below must still run, or a permanently unwritable bucket would stop retention
+    // and fill the staging disk.
     if (remote) {
       const remoteNames = new Set(await this.filenamesIn(remote.backend, store.prefix));
       for (const filename of await localNames()) {
-        if (!isValidDatabaseRoutineBackupName(filename)) {
+        // `uploaded-` backups are promoted too, so an admin upload whose own promote failed is retried;
+        // restore points never are.
+        if (!isValidDatabaseBackupName(filename) || isRestorePoint(filename)) {
           continue;
         }
         if (remoteNames.has(filename)) {
+          // already in the bucket, so the local copy is a duplicate
           await store.staging.delete(store.key(filename));
           continue;
         }
-        await this.promoteToRemote(store, filename);
+        try {
+          await this.promoteToRemote(store, filename);
+        } catch (error) {
+          promoteFailures.push(filename);
+          this.logger.error(String(error));
+        }
       }
     }
 
-    // Retention applies to whichever backend holds the canonical set. Pruning the staging disk while
-    // S3 is on would delete a straggler the next run could still promote.
-    const canonical = remote
-      ? {
-          list: () => this.filenamesIn(remote.backend, store.prefix),
-          delete: (filename: string) => remote.backend.delete(store.key(filename)),
-        }
-      : {
-          list: localNames,
-          delete: (filename: string) => store.staging.delete(store.key(filename)),
-        };
-
-    const canonicalNames = await canonical.list();
-    const toDelete = canonicalNames
+    // Retention applies to every routine backup the admin can see, across both backends, so
+    // `keepLastAmount` bounds the total however the uploads are faring. Deleting by filename hits both
+    // sides; `delete` is a no-op where the backup is not present.
+    const routine = [
+      ...new Set([...(await localNames()), ...(remote ? await this.filenamesIn(remote.backend, store.prefix) : [])]),
+    ]
       .filter((filename) => isValidDatabaseRoutineBackupName(filename))
       .toSorted()
-      .toReversed()
-      .slice(config.keepLastAmount);
+      .toReversed();
 
+    const toDelete = routine.slice(config.keepLastAmount);
     for (const filename of toDelete) {
-      await canonical.delete(filename);
+      await store.staging.delete(store.key(filename));
+      if (remote) {
+        await remote.backend.delete(store.key(filename));
+      }
     }
 
     // Failed dumps are always local — the promote only ever runs on a finished file — so the staging
-    // disk is swept for them whichever backend is canonical.
-    const localNamesAfterPromote = await localNames();
-    const failedBackups = localNamesAfterPromote.filter((filename) => isFailedDatabaseBackupName(filename));
+    // disk is swept for them whichever backend holds the canonical set.
+    const localAfterPrune = await localNames();
+    const failedBackups = localAfterPrune.filter((filename) => isFailedDatabaseBackupName(filename));
     for (const filename of failedBackups) {
       await store.staging.delete(store.key(filename));
     }
 
     this.logger.debug(`Database Backup Cleanup Finished, deleted ${toDelete.length + failedBackups.length} backups`);
+
+    // Reported only now that retention has run, so the job still fails and names the bucket.
+    if (promoteFailures.length > 0) {
+      throw new Error(
+        `Failed to upload ${promoteFailures.length} database backup(s) to S3 bucket "${remote?.bucket}": ${promoteFailures.join(', ')}. They are still on local disk and the next run will retry.`,
+      );
+    }
   }
 
   async restoreDatabaseBackup(
@@ -568,7 +611,7 @@ export class DatabaseBackupService {
 
       progressCb?.('backup', 0.05);
 
-      const restorePointFilename = await this.createDatabaseBackup('restore-point-');
+      const restorePointFilename = await this.createDatabaseBackup(RESTORE_POINT_PREFIX);
 
       this.logger.log(`Database Restore Starting. Database Version: ${databaseMajorVersion}`);
 
@@ -576,6 +619,10 @@ export class DatabaseBackupService {
       const { stream: backupStream } = await source.backend.get(source.key);
       if (filename.endsWith('.gz')) {
         const gunzip = this.storageRepository.createGunzip();
+        // `pipe` does not forward errors, and a read that fails mid-stream is a real possibility now that
+        // the source may be S3 (a dropped socket, an expired credential). Without this the error lands on
+        // `backupStream` with no listener and takes the worker down instead of rolling the restore back.
+        backupStream.on('error', (error) => gunzip.destroy(error));
         backupStream.pipe(gunzip);
         inputStream = gunzip;
       } else {
@@ -618,6 +665,7 @@ export class DatabaseBackupService {
         // the restore point is never promoted, so it is always on the staging disk
         const { stream: restorePointStream } = await store.staging.get(store.key(restorePointFilename));
         const gunzip = this.storageRepository.createGunzip();
+        restorePointStream.on('error', (error) => gunzip.destroy(error));
         restorePointStream.pipe(gunzip);
         inputStream = gunzip;
 

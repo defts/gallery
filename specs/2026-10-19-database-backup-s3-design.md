@@ -50,11 +50,19 @@ admin is left with a single switch.
 - **One key space.** `backups/<filename>` on both backends: `DiskStorageBackend` resolves it under the media
   location, and it is the S3 object key verbatim. A promote therefore copies a key rather than translating one, and
   `S3StorageBackend` needs no prefix support of its own (media does not use any).
+- **`list(prefix)` returns only the direct children of the prefix** on both backends: the S3 implementation
+  passes `Delimiter: '/'`. A recursive listing would return keys whose filename no longer reconstructs the key, so
+  a caller round-tripping a listing into `delete` — which is exactly what retention does — would silently delete
+  nothing.
 - **`list(prefix)` is the only addition to `StorageBackend`.** `rename` is added to `DiskStorageBackend` alone,
   because S3 has no move — only a copy-then-delete that is neither atomic nor cheap for a multi-gigabyte object —
   and the single caller only ever moves a file on the staging disk.
 - **The cross-field rule lives in `ConfigValidate`, not in a `superRefine`.** The config schemas feed
   `createZodDto` and OpenAPI generation (see `server/src/utils/config.ts`), which a refinement would not survive.
+  It validates only the **transition** to on, not any config whose flag is already on: rejecting the latter would
+  brick every unrelated admin save once `IMMICH_STORAGE_BACKEND` stopped being `s3`, and since the UI hides the
+  group off S3 there would be no control left to turn it off with. An already-on flag on a disk-backed server is
+  handled where it matters instead — `resolve()` degrades to local-only with a warning.
 - **`downloadBackup` returns an `ImmichMediaResponse`, not a `ServeStrategy`.** `sendFile` already dispatches the
   three cases, and both call sites (`database-backup.controller.ts` and `maintenance-worker.controller.ts`) go
   through it, so converting in the service leaves both controllers untouched instead of duplicating the dispatch.
@@ -93,20 +101,30 @@ Keys are relative throughout, and identical on both backends (`backups/<filename
 always resolved to disk, because `isDiskPath` is `isAbsolute`; relative keys are what make one call site work
 against either backend, and the fixed prefix is what lets a promote reuse the same key rather than translating it.
 
-| Operation                | Behaviour                                                                                                                                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createDatabaseBackup`   | Pipes `pg_dump \| gzip` into `staging.put(<key>.tmp)`, promotes with `staging.rename`, then uploads and deletes the local copy. A `restore-point-` prefixed backup is never uploaded.                     |
-| `promoteToRemote`        | The shared staged promote: `staging.get` streamed into `remote.backend.put`, then `staging.delete`. Also used by `uploadBackup` and by the straggler retry in cleanup.                                    |
-| `uploadBackup`           | Admin-supplied file, same staged path through the shared helper.                                                                                                                                          |
-| `listBackups`            | Unions `remote.backend.list()` with `staging.list()`, deduplicated by filename, so a partial outage still shows one coherent set. Local is read last and wins, because it is the copy an admin can fetch. |
-| `cleanupDatabaseBackups` | Retries stragglers, prunes the canonical set to `keepLastAmount`, and always sweeps the staging disk for `.tmp` files (section 4).                                                                        |
-| `downloadBackup`         | Resolves the backup, asks that backend for a serve strategy, and converts it to the matching `ImmichMediaResponse`.                                                                                       |
-| `restoreDatabaseBackup`  | Reads through `backend.get`, so **restore-from-S3 comes free**. The rollback restore point is always read from the staging disk.                                                                          |
-| `deleteBackup`           | Deletes from both backends; `delete` is a no-op on a missing disk file, so attempting both is safe.                                                                                                       |
+| Operation                | Behaviour                                                                                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createDatabaseBackup`   | Pipes `pg_dump \| gzip` into `staging.put(<key>.tmp)` and renames it to its real name. Does **not** upload — see section 3.                                     |
+| `promoteToRemote`        | The staged promote: `staging.get` streamed into `remote.backend.put`, then `staging.delete`. Called by the retention pass and by `uploadBackup`.                |
+| `uploadBackup`           | Admin-supplied file, same staged path through the shared helper.                                                                                                |
+| `listBackups`            | Unions both listings, deduplicated by filename, local winning. A failure on one side is warned and skipped, so an unreachable bucket cannot hide local backups. |
+| `cleanupDatabaseBackups` | Promotes, prunes the union to `keepLastAmount`, sweeps local `.tmp` files, then reports any upload failure (section 4).                                         |
+| `downloadBackup`         | Resolves the backup, asks that backend for a serve strategy, and converts it to the matching `ImmichMediaResponse`.                                             |
+| `restoreDatabaseBackup`  | Reads through `backend.get`, so **restore-from-S3 comes free**. The rollback restore point is always read from the staging disk.                                |
+| `deleteBackup`           | Deletes from both backends; `delete` is a no-op on a missing disk file, so attempting both is safe.                                                             |
 
 `locate(filename)` is local-first, then remote: a backup whose upload failed is still on disk and must stay
 downloadable and restorable from there, while everything else exists only in the bucket. Neither place holding it
 is a `NotFoundException`.
+
+**The backup backend forces `serveMode: 'proxy'`,** whatever media uses. In `redirect` mode `getServeStrategy`
+answers with a presigned URL valid for `IMMICH_S3_PRESIGNED_URL_EXPIRY` (3600s by default), and anyone holding
+that URL can fetch it with no Immich session — acceptable for a thumbnail, not for a database dump carrying every
+user's password hash and session tokens. Proxying keeps the download on the authenticated admin route where
+`Permission.BackupDownload` actually applies.
+
+**The restore read forwards stream errors.** `pipe()` does not, and the source may now be S3, so a dropped socket
+mid-restore would otherwise be an unhandled `'error'` that takes the worker down instead of rolling the restore
+back.
 
 **The `.tmp` promote still matters.** `isValidDatabaseBackupName` excludes `.tmp` and `isFailedDatabaseBackupName`
 matches it, so a dump killed half way can never be listed or restored as a valid backup. With a remote configured
@@ -114,33 +132,54 @@ the upload only ever runs on the promoted file, so no `.tmp` key ever reaches S3
 
 ## 3. Failure semantics
 
-| Step fails                       | Result                                                                                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pg_dump` / `gzip`               | Unchanged from before: the `.tmp` key is deleted, nothing is promoted, the job fails.                                                       |
-| S3 upload                        | **The local file is kept.** The job fails and the error names the bucket and key. Nothing is lost, and the next run promotes the straggler. |
-| Local delete after a good upload | Warned, job still succeeds — the object is safely in S3, and the straggler is swept by the next cleanup.                                    |
+| Step fails                       | Result                                                                                                                               |
+| :------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| `pg_dump` / `gzip`               | Unchanged from before: the `.tmp` key is deleted, nothing is promoted, the job fails.                                                |
+| S3 upload                        | **The local file is kept**, retention still runs, and the job then fails with the bucket named. The next run retries the upload.     |
+| Local delete after a good upload | Warned, job still succeeds — the object is safely in S3, and the straggler is swept by the next cleanup.                             |
+| Listing the bucket               | Warned; the backup list falls back to the local one, so an unreachable bucket cannot hide backups an admin could still restore from. |
 
-So a broken bucket or an expired credential degrades to the old local-only behaviour rather than losing backups.
+So a broken bucket or an expired credential degrades to the old local-only behaviour rather than losing backups
+or stopping retention.
+
+**Why the promote lives in cleanup and not in `createDatabaseBackup`.** An earlier revision uploaded at the end of
+`createDatabaseBackup`. A review caught that this is unsafe: the throw escaped `createDatabaseBackup`,
+`handleBackupDatabase` rethrew it, and `cleanupDatabaseBackups()` on the next line never ran. Retention, the
+`.tmp` sweep **and** the straggler-retry loop all live in cleanup, so an unwritable bucket silently stopped all
+three — each cron tick added one more un-pruned dump to the media volume until it filled, at which point there
+were no backups at all. The upload is retryable and the dump on disk is already a valid backup, so promoting is
+now part of the retention pass: failures are collected, the prune and the sweep still run, and one aggregate
+error is thrown at the end so the job still reports failure. `handleBackupDatabase` is untouched upstream text.
 
 The dump pipeline is wired so the backend owns the destination: `pipeline(pgdump, gzip, passthrough)` runs
 alongside `staging.put(key, passthrough)`, with the pipeline's own rejection captured and rethrown after the put
 settles. A `pg_dump` failure destroys the passthrough, which surfaces as the put rejecting, and the captured error
 is the one reported.
 
-## 4. Retention with two backends
+## 4. Retention across both backends
 
-Retention applies to whichever backend holds the canonical set — S3 when the gate is satisfied, the staging disk
-otherwise. Pruning the staging disk while S3 is on would delete a straggler the next run could still promote.
+`keepLastAmount` applies to every routine backup the admin can see, as the union of both backends' listings, so
+the total is bounded however the uploads are faring. An earlier revision pruned only the "canonical" set (S3 when
+enabled), which meant local stragglers from failed uploads were never counted or pruned — the unbounded growth
+described above. Deleting by filename now hits both sides; `delete` is a no-op where the backup is not present.
 
-Cleanup therefore does three things, in order:
+Cleanup does three things, in this order:
 
-1. **Retry stragglers.** Each local routine backup is promoted if the bucket does not have it, or deleted locally
-   if it does (it is then just a duplicate).
-2. **Prune the canonical set** to `keepLastAmount`, newest first.
-3. **Sweep the staging disk** for `.tmp` files, which only ever exist locally.
+1. **Promote.** Every local backup that is not already in the bucket is uploaded and its local copy removed;
+   one already there is just a duplicate and is deleted locally. `uploaded-` backups are included, so an admin
+   upload whose own promote failed is retried. Failures are collected, not thrown.
+2. **Prune** the union to `keepLastAmount`, newest first.
+3. **Sweep** the staging disk for `.tmp` files, which only ever exist locally.
 
-`restore-point-*` files are untouched, as before: they match neither the routine nor the failed-backup pattern, and
-they are the restore flow's own local safety net.
+Then, if any promote failed, one error naming the bucket and the affected filenames.
+
+`restore-point-*` files are untouched throughout: they match neither the routine nor the failed-backup pattern,
+they are the restore flow's own local safety net, and they must not depend on the remote a restore may be reading
+from. Upstream never pruned them either.
+
+**Turning the feature off leaves the objects in the bucket.** Retention can only prune a backend it resolves, so
+once `remote` is gone the objects under `backups/` are no longer managed. This is deliberate and documented for
+the admin rather than silently cleaned up.
 
 ## 5. Gating the UI
 

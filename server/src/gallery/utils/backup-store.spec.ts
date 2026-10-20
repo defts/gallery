@@ -119,6 +119,20 @@ describe('BackupStoreResolver', () => {
   describe('credential reuse', () => {
     // The whole point of the gate: there is no second set of S3 settings to get wrong, and nothing
     // here comes from the saved config, so no S3 secret is ever stored in the database.
+    // A presigned redirect would let anyone holding the URL fetch the whole database dump with no Immich
+    // session, for IMMICH_S3_PRESIGNED_URL_EXPIRY seconds. Backups stay on the authenticated admin route.
+    it('forces proxy serve mode, whatever media uses', async () => {
+      withS3Config({ enabled: true });
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({ storage: { backend: 's3', s3: { bucket: 'media', serveMode: 'redirect' } as never } }),
+      );
+
+      await sut.resolve();
+
+      expect(sut.built).toHaveLength(1);
+      expect(sut.built[0].serveMode).toBe('proxy');
+    });
+
     it('builds the S3 client from the media settings verbatim, bucket included', async () => {
       withS3Config({ enabled: true });
       const s3 = {
@@ -134,7 +148,7 @@ describe('BackupStoreResolver', () => {
 
       const store = await sut.resolve();
 
-      expect(sut.built).toEqual([s3]);
+      expect(sut.built).toEqual([{ ...s3, serveMode: 'proxy' }]);
       expect(store.remote?.bucket).toBe('media');
     });
   });
@@ -181,18 +195,37 @@ const configWith = (enabled: boolean) =>
   ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
 describe('validateBackupS3Config', () => {
-  it('refuses to enable S3 backups while the storage backend is disk', () => {
-    expect(() => validateBackupS3Config(configWith(true), { storage: { backend: 'disk' } })).toThrow(
+  it('refuses a save that turns S3 backups on while the storage backend is disk', () => {
+    expect(() => validateBackupS3Config(configWith(true), configWith(false), { storage: { backend: 'disk' } })).toThrow(
       /S3 storage backend/,
     );
   });
 
-  it('allows enabling S3 backups on the s3 storage backend', () => {
-    expect(() => validateBackupS3Config(configWith(true), { storage: { backend: 's3' } })).not.toThrow();
+  it('allows turning S3 backups on on the s3 storage backend', () => {
+    expect(() =>
+      validateBackupS3Config(configWith(true), configWith(false), { storage: { backend: 's3' } }),
+    ).not.toThrow();
   });
 
   it('allows a disk-backed server to leave S3 backups off', () => {
-    expect(() => validateBackupS3Config(configWith(false), { storage: { backend: 'disk' } })).not.toThrow();
+    expect(() =>
+      validateBackupS3Config(configWith(false), configWith(false), { storage: { backend: 'disk' } }),
+    ).not.toThrow();
+  });
+
+  // Regression: rejecting any config whose flag is already on would brick EVERY admin config save once
+  // IMMICH_STORAGE_BACKEND stopped being s3 — and the UI hides the group off S3, so nothing could turn it
+  // off again. Only the transition is validated; an already-on flag degrades to local-only in resolve().
+  it('allows an unrelated save while the flag is already on and the backend is no longer s3', () => {
+    expect(() =>
+      validateBackupS3Config(configWith(true), configWith(true), { storage: { backend: 'disk' } }),
+    ).not.toThrow();
+  });
+
+  it('allows turning it off again from a disk-backed server', () => {
+    expect(() =>
+      validateBackupS3Config(configWith(false), configWith(true), { storage: { backend: 'disk' } }),
+    ).not.toThrow();
   });
 });
 

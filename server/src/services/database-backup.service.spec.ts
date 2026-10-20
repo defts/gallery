@@ -391,26 +391,35 @@ describe(DatabaseBackupService.name, () => {
       expect(staging.delete).toHaveBeenCalled();
     });
 
-    describe('the staged promote to S3', () => {
+    describe('with S3 configured', () => {
       beforeEach(() => {
         enableRemote();
         staging.list.mockResolvedValue([]);
         remote.list.mockResolvedValue([]);
       });
 
-      it('should upload the finished backup and then delete the local copy', async () => {
-        const result = await sut.handleBackupDatabase();
+      // The dump is a valid local backup on its own and the upload is retryable, so promoting is the
+      // retention pass's job. Doing it here would let an upload failure escape handleBackupDatabase and
+      // skip cleanup entirely, stopping retention for as long as the bucket stayed unwritable.
+      it('should not upload from the dump path itself', async () => {
+        await expect(sut.handleBackupDatabase()).resolves.toBe(JobStatus.Success);
 
-        expect(result).toBe(JobStatus.Success);
-        const [backupKey] = staging.rename.mock.calls[0].slice(1);
-        const filename = backupKey.replace('backups/', '');
-        expect(remote.put).toHaveBeenCalledWith(`backups/${filename}`, expect.anything(), {
-          contentType: 'application/gzip',
-        });
-        expect(staging.delete).toHaveBeenCalledWith(backupKey);
+        expect(staging.rename).toHaveBeenCalled();
+        expect(remote.put).not.toHaveBeenCalled();
       });
 
-      it('should only upload after the dump is complete, never a .tmp key', async () => {
+      it('should upload and then delete the local copy during cleanup', async () => {
+        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz', expect.anything(), {
+          contentType: 'application/gzip',
+        });
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+      });
+
+      it('should never upload a .tmp key', async () => {
         await sut.handleBackupDatabase();
 
         for (const [key] of remote.put.mock.calls) {
@@ -418,24 +427,80 @@ describe(DatabaseBackupService.name, () => {
         }
       });
 
-      it('should keep the local file and fail the job when the upload fails, naming the bucket', async () => {
+      it('should keep the local file and fail, naming the bucket, when the upload fails', async () => {
+        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
         remote.put.mockRejectedValue(new Error('NoSuchBucket'));
 
-        await expect(sut.handleBackupDatabase()).rejects.toThrow(/media/);
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/media/);
 
-        const [, backupKey] = staging.rename.mock.calls[0];
-        expect(staging.delete).not.toHaveBeenCalledWith(backupKey);
+        expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+      });
+
+      // Regression (review, critical): the promote used to throw out of createDatabaseBackup, which made
+      // handleBackupDatabase rethrow and skip cleanup. Retention, the .tmp sweep AND the straggler retry
+      // all live in cleanup, so an unwritable bucket stopped all three and the staging disk grew for ever.
+      it('should still prune and sweep when the upload fails', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
+        staging.list.mockResolvedValue(
+          listingUnder('backups/')(
+            'immich-db-backup-1.sql.gz',
+            'immich-db-backup-2.sql.gz',
+            'immich-db-backup-3.sql.gz.tmp',
+          ),
+        );
+        remote.put.mockRejectedValue(new Error('AccessDenied'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/AccessDenied|media/);
+
+        // the older of the two routine backups is pruned even though neither could be uploaded...
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        // ...and the failed dump is still swept
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
+      });
+
+      // Regression (review, high): retention used to apply only to the canonical set, which was S3 when
+      // enabled. While uploads failed, local stragglers were never counted or pruned, so one full dump
+      // accumulated per cron tick until the media volume filled.
+      it('should bound the local set by keepLastAmount even when nothing can be uploaded', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
+        staging.list.mockResolvedValue(
+          listingUnder('backups/')(
+            'immich-db-backup-1.sql.gz',
+            'immich-db-backup-2.sql.gz',
+            'immich-db-backup-3.sql.gz',
+          ),
+        );
+        remote.put.mockRejectedValue(new Error('AccessDenied'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow();
+
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-2.sql.gz');
+        expect(staging.delete).not.toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz');
       });
 
       it('should still succeed when the local delete fails after a good upload', async () => {
+        staging.list.mockResolvedValue(listingUnder('backups/')('immich-db-backup-1.sql.gz'));
         staging.delete.mockRejectedValue(new Error('EBUSY'));
 
-        await expect(sut.handleBackupDatabase()).resolves.toBe(JobStatus.Success);
+        await expect(sut.cleanupDatabaseBackups()).resolves.toBeUndefined();
         expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('failed to delete the local copy'));
       });
 
-      it('should keep a restore point local, because the restore flow needs it on disk', async () => {
-        await sut.createDatabaseBackup('restore-point-');
+      // Regression (review, low): the straggler loop only considered routine names, so an admin upload
+      // whose own promote failed stayed host-only for ever.
+      it('should retry an uploaded- backup whose promote failed earlier', async () => {
+        staging.list.mockResolvedValue(listingUnder('backups/')('uploaded-mine.sql.gz'));
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).toHaveBeenCalledWith('backups/uploaded-mine.sql.gz', expect.anything(), expect.anything());
+      });
+
+      it('should never promote a restore point, which the restore flow needs locally', async () => {
+        staging.list.mockResolvedValue(listingUnder('backups/')('restore-point-immich-db-backup-1.sql.gz'));
+
+        await sut.cleanupDatabaseBackups();
 
         expect(remote.put).not.toHaveBeenCalled();
         expect(staging.delete).not.toHaveBeenCalled();
@@ -926,6 +991,28 @@ describe(DatabaseBackupService.name, () => {
       await expect(sut.listBackups()).resolves.toMatchObject({
         backups: [{ filename: 'immich-db-backup-1.sql.gz', filesize: 99 }],
       });
+    });
+
+    // Regression (review, high): this list drives the admin UI and the maintenance-mode restore picker.
+    // It used to throw outright when the bucket was unreachable, hiding the local backups an admin could
+    // still have restored from — the opposite of what the union is for.
+    it('should fall back to the local listing when the bucket is unreachable', async () => {
+      enableRemote();
+      remote.list.mockRejectedValue(new Error('ECONNREFUSED'));
+      staging.list.mockResolvedValue([{ key: 'backups/immich-db-backup-1.sql.gz', size: 7 }]);
+
+      await expect(sut.listBackups()).resolves.toMatchObject({
+        backups: [{ filename: 'immich-db-backup-1.sql.gz', filesize: 7 }],
+      });
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('Could not list database backups in S3'));
+    });
+
+    it('should still report a failure when neither backend can be listed', async () => {
+      enableRemote();
+      remote.list.mockRejectedValue(new Error('ECONNREFUSED'));
+      staging.list.mockRejectedValue(new Error('EIO'));
+
+      await expect(sut.listBackups()).rejects.toThrow(/ECONNREFUSED|EIO/);
     });
 
     it('should ignore objects under the prefix that are not backups', async () => {

@@ -44,8 +44,17 @@ export interface BackupStore {
  * survive. Without this an admin could reach a state over the API that the UI never offers, because the UI
  * hides the whole group when the storage backend is not S3.
  */
-export const validateBackupS3Config = (newConfig: SystemConfig, env: { storage: { backend: 'disk' | 's3' } }): void => {
-  if (newConfig.backup.database.s3.enabled && env.storage.backend !== 's3') {
+export const validateBackupS3Config = (
+  newConfig: SystemConfig,
+  oldConfig: SystemConfig,
+  env: { storage: { backend: 'disk' | 's3' } },
+): void => {
+  // Only a save that TURNS IT ON is rejected. Rejecting any config whose flag is already on would brick
+  // every unrelated admin save once IMMICH_STORAGE_BACKEND stopped being s3 — and since the UI hides the
+  // whole group off the S3 backend, there would be no control left to turn it off with. An already-on flag
+  // on a disk-backed server is handled where it matters instead: `resolve()` degrades to local-only.
+  const turningOn = newConfig.backup.database.s3.enabled && !oldConfig.backup.database.s3.enabled;
+  if (turningOn && env.storage.backend !== 's3') {
     throw new Error(
       'Database backups can only be uploaded to S3 while the server is running on the S3 storage backend. Set IMMICH_STORAGE_BACKEND=s3 first, or leave this off.',
     );
@@ -123,11 +132,17 @@ export class BackupStoreResolver {
   }
 
   private getRemoteBackend(config: S3StorageConfig): StorageBackend {
+    // Media's serve mode is not inherited. In `redirect` mode `getServeStrategy` answers with a presigned
+    // URL valid for IMMICH_S3_PRESIGNED_URL_EXPIRY (3600s by default), and anyone holding that URL can
+    // fetch it with no Immich session: acceptable for a thumbnail, not for a full database dump, which
+    // carries every user's hashed password and session tokens. Forcing `proxy` keeps the download on the
+    // authenticated admin route, where the Permission.BackupDownload check actually applies.
+    const backupConfig: S3StorageConfig = { ...config, serveMode: 'proxy' };
     // `accessKeyId` is part of the identity of the client, so a rotated credential rebuilds it; the secret is
     // not included, since a signature is a cache key and nothing more.
     const signature = JSON.stringify([config.bucket, config.region, config.endpoint, config.accessKeyId]);
     if (this.cached?.signature !== signature) {
-      this.cached = { signature, backend: this.createS3Backend(config) };
+      this.cached = { signature, backend: this.createS3Backend(backupConfig) };
       this.logger.log(`Database backups will be uploaded to S3 (bucket: ${config.bucket}, prefix: ${BACKUP_PREFIX})`);
     }
     return this.cached.backend;

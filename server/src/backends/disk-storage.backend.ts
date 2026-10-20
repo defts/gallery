@@ -1,4 +1,4 @@
-import { Dirent, constants, createReadStream, createWriteStream } from 'node:fs';
+import { Dirent, constants, createReadStream } from 'node:fs';
 import { mkdir, opendir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -45,8 +45,11 @@ export class DiskStorageBackend implements StorageBackend {
     if (Buffer.isBuffer(source)) {
       await writeFile(fullPath, source);
     } else {
-      const writeStream = createWriteStream(fullPath);
-      await pipeline(source, writeStream);
+      // Through the repository, not a bare `createWriteStream`: it opens the stream with `flush: true`,
+      // which fsyncs before close. The database backup needs that — the dump is renamed to its real name
+      // and then uploaded as soon as this resolves, so an unflushed tail would promote a truncated file
+      // after a host crash. It is also what the class comment above promises: upstream's own write path.
+      await pipeline(source, this.storageRepository.createWriteStream(fullPath));
     }
   }
 
@@ -93,14 +96,21 @@ export class DiskStorageBackend implements StorageBackend {
 
     const results: Array<{ key: string; size: number }> = [];
     for (const entry of entries) {
-      if (!entry.isFile()) {
+      // Deliberately not `entry.isFile()`: that is false for a symlink, and a backups folder is a
+      // plausible place to find one (an admin pointing at a bigger volume). `stat` follows the link, so a
+      // symlinked file is listed — and therefore visible to retention — while directories still are not.
+      if (!entry.isFile() && !entry.isSymbolicLink()) {
         continue;
       }
       try {
-        const { size } = await stat(join(folder, entry.name));
-        results.push({ key: join(prefix, entry.name), size });
+        const entryStat = await stat(join(folder, entry.name));
+        if (!entryStat.isFile()) {
+          continue;
+        }
+        results.push({ key: join(prefix, entry.name), size: entryStat.size });
       } catch (error: any) {
-        // same race as getFolderSize: a file a delete job removed mid-walk is simply not listed
+        // same race as getFolderSize: a file a delete job removed mid-walk is simply not listed. A
+        // dangling symlink lands here too, and is likewise simply not listed.
         if (error.code !== 'ENOENT') {
           throw error;
         }
