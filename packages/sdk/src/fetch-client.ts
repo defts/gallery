@@ -54,6 +54,14 @@ export type ActivityStatisticsResponseDto = {
     /** Number of likes */
     likes: number;
 };
+export type AdminConfigDatabaseBackupS3Dto = {
+    /** Bucket for database backups. Empty reuses the media bucket (IMMICH_S3_BUCKET). */
+    bucket: string;
+    /** Upload scheduled database backups to S3 */
+    enabled?: boolean;
+    /** Key prefix for database backup objects */
+    prefix: string;
+};
 export type AdminConfigDatabaseBackupDto = {
     /** Cron expression */
     cronExpression: string;
@@ -61,6 +69,7 @@ export type AdminConfigDatabaseBackupDto = {
     enabled: boolean;
     /** Keep last amount */
     keepLastAmount: number;
+    s3: AdminConfigDatabaseBackupS3Dto;
 };
 export type AdminConfigBackupsDto = {
     database: AdminConfigDatabaseBackupDto;
@@ -3607,6 +3616,8 @@ export type ServerFeaturesDto = {
     realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
+    /** Whether the server is running on the S3 storage backend */
+    s3Storage: boolean;
     /** Whether search is enabled */
     search: boolean;
     /** Whether sidecar files are supported */

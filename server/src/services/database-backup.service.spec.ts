@@ -1,21 +1,66 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { Duplex, PassThrough, Readable } from 'node:stream';
-import { StorageCore } from 'src/cores/storage.core.js';
+import { buffer } from 'node:stream/consumers';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
-import { ImmichWorker, JobStatus, StorageFolder } from 'src/enum.js';
+import { ImmichWorker, JobStatus } from 'src/enum.js';
+import { BackupStore } from 'src/gallery/utils/backup-store.js';
 import { MaintenanceHealthRepository } from 'src/maintenance/maintenance-health.repository.js';
 import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { AutoMocked, ServiceMocks, automock, getMocks, mockDuplex, mockSpawn } from 'test/utils.js';
 
+/**
+ * Every backup file operation now goes through a storage backend, so these are the seams the service
+ * is asserted against. `put` drains its source: the dump pipeline only completes once something has
+ * consumed the gzip output, exactly as a real backend does.
+ */
+const fakeBackend = () => ({
+  put: vitest.fn(async (_key: string, source: Readable | Buffer) => {
+    if (!Buffer.isBuffer(source)) {
+      await buffer(source);
+    }
+  }),
+  get: vitest.fn((_key: string) => Promise.resolve({ stream: Readable.from(mockData()) })),
+  delete: vitest.fn((_key: string) => Promise.resolve()),
+  exists: vitest.fn((_key: string) => Promise.resolve(true)),
+  list: vitest.fn((_prefix: string) => Promise.resolve([] as Array<{ key: string; size: number }>)),
+  rename: vitest.fn((_from: string, _to: string) => Promise.resolve()),
+  getServeStrategy: vitest.fn((key: string) => Promise.resolve({ type: 'file' as const, path: `/data/${key}` })),
+});
+
+type FakeBackend = ReturnType<typeof fakeBackend>;
+
+const listingUnder =
+  (prefix: string) =>
+  (...filenames: string[]) =>
+    filenames.map((filename) => ({ key: `${prefix}${filename}`, size: 1 }));
+
+const configWithS3 = (enabled: boolean) =>
+  ({
+    backup: { database: { ...defaults.backup.database, s3: { enabled, bucket: '', prefix: '' } } },
+  }) as SystemConfig;
+
 describe(DatabaseBackupService.name, () => {
   let sut: DatabaseBackupService;
   let mocks: ServiceMocks;
   let maintenanceHealthRepositoryMock: AutoMocked<MaintenanceHealthRepository>;
+  let staging: FakeBackend;
+  let remote: FakeBackend;
+  let store: BackupStore;
+  let resolver: { resolve: () => Promise<BackupStore> };
+
+  /** Turns the remote on for a test, as a configured S3 bucket would. */
+  const enableRemote = () => {
+    store.remote = { backend: remote as never, bucket: 'db-backups', key: (filename) => `nightly/${filename}` };
+  };
 
   beforeEach(() => {
     mocks = getMocks();
+    staging = fakeBackend();
+    remote = fakeBackend();
+    store = { staging: staging as never, stagingKey: (filename) => `backups/${filename}` };
+    resolver = { resolve: () => Promise.resolve(store) };
     maintenanceHealthRepositoryMock = automock(MaintenanceHealthRepository, {
       args: [mocks.logger],
       strict: false,
@@ -31,6 +76,7 @@ describe(DatabaseBackupService.name, () => {
       mocks.cron as never,
       mocks.job as never,
       maintenanceHealthRepositoryMock as never,
+      resolver as never,
     );
   });
 
@@ -100,76 +146,128 @@ describe(DatabaseBackupService.name, () => {
   });
 
   describe('cleanupDatabaseBackups', () => {
-    it('should do nothing if not reached keepLastAmount', async () => {
+    const listing = listingUnder('backups/');
+    const remoteListing = listingUnder('nightly/');
+
+    beforeEach(() => {
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      mocks.storage.readdir.mockResolvedValue(['immich-db-backup-1.sql.gz']);
+    });
+
+    it('should do nothing if not reached keepLastAmount', async () => {
+      staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
       await sut.cleanupDatabaseBackups();
-      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+      expect(staging.delete).not.toHaveBeenCalled();
     });
 
     it('should remove failed backup files', async () => {
-      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      //`immich-db-backup-${DateTime.now().toFormat("yyyyLLdd'T'HHmmss")}-v${serverVersion.toString()}-pg${databaseVersion.split(' ')[0]}.sql.gz.tmp`,
-      mocks.storage.readdir.mockResolvedValue([
-        'immich-db-backup-123.sql.gz.tmp',
-        `immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
-        `immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
-        `immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
-      ]);
+      staging.list.mockResolvedValue(
+        listing(
+          'immich-db-backup-123.sql.gz.tmp',
+          `immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
+          `immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+          `immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
+        ),
+      );
       await sut.cleanupDatabaseBackups();
-      expect(mocks.storage.unlink).toHaveBeenCalledTimes(3);
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-123.sql.gz.tmp`,
+      expect(staging.delete).toHaveBeenCalledTimes(3);
+      expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-123.sql.gz.tmp');
+      expect(staging.delete).toHaveBeenCalledWith(
+        'backups/immich-db-backup-20250725T110216-v1.234.5-pg14.5.sql.gz.tmp',
       );
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-20250725T110216-v1.234.5-pg14.5.sql.gz.tmp`,
-      );
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-20250729T110116-v1.234.5-pg14.5.sql.gz.tmp`,
+      expect(staging.delete).toHaveBeenCalledWith(
+        'backups/immich-db-backup-20250729T110116-v1.234.5-pg14.5.sql.gz.tmp',
       );
     });
 
     it('should remove old backup files over keepLastAmount', async () => {
-      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      mocks.storage.readdir.mockResolvedValue(['immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz']);
+      staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz'));
       await sut.cleanupDatabaseBackups();
-      expect(mocks.storage.unlink).toHaveBeenCalledTimes(1);
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-1.sql.gz`,
-      );
+      expect(staging.delete).toHaveBeenCalledTimes(1);
+      expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
     });
 
     it('should remove old backup files over keepLastAmount and failed backups', async () => {
-      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      mocks.storage.readdir.mockResolvedValue([
-        `immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
-        `immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
-        'immich-db-backup-1753789649000.sql.gz',
-        `immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
-      ]);
+      staging.list.mockResolvedValue(
+        listing(
+          `immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
+          `immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+          'immich-db-backup-1753789649000.sql.gz',
+          `immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+        ),
+      );
       await sut.cleanupDatabaseBackups();
-      expect(mocks.storage.unlink).toHaveBeenCalledTimes(3);
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-1753789649000.sql.gz`,
+      expect(staging.delete).toHaveBeenCalledTimes(3);
+      expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1753789649000.sql.gz');
+      expect(staging.delete).toHaveBeenCalledWith(
+        'backups/immich-db-backup-20250725T110216-v1.234.5-pg14.5.sql.gz.tmp',
       );
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-20250725T110216-v1.234.5-pg14.5.sql.gz.tmp`,
-      );
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/immich-db-backup-20250727T110116-v1.234.5-pg14.5.sql.gz`,
-      );
+      expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-20250727T110116-v1.234.5-pg14.5.sql.gz');
+    });
+
+    describe('with S3 enabled', () => {
+      beforeEach(() => {
+        enableRemote();
+      });
+
+      it('should prune the S3 objects over keepLastAmount, not the local folder', async () => {
+        staging.list.mockResolvedValue([]);
+        remote.list.mockResolvedValue(remoteListing('immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz'));
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.delete).toHaveBeenCalledTimes(1);
+        expect(remote.delete).toHaveBeenCalledWith('nightly/immich-db-backup-1.sql.gz');
+      });
+
+      it('should promote a straggler left by a failed upload rather than orphaning it', async () => {
+        staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
+        remote.list.mockResolvedValue([]);
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).toHaveBeenCalledWith('nightly/immich-db-backup-1.sql.gz', expect.anything(), {
+          contentType: 'application/gzip',
+        });
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+      });
+
+      it('should delete a local copy that is already in the bucket without re-uploading it', async () => {
+        staging.list.mockResolvedValue(listing('immich-db-backup-1.sql.gz'));
+        remote.list.mockResolvedValue(remoteListing('immich-db-backup-1.sql.gz'));
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).not.toHaveBeenCalled();
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+      });
+
+      it('should still sweep local .tmp files, which only ever exist on the staging disk', async () => {
+        staging.list.mockResolvedValue(listing('immich-db-backup-123.sql.gz.tmp'));
+        remote.list.mockResolvedValue([]);
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).not.toHaveBeenCalled();
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-123.sql.gz.tmp');
+      });
+
+      it('should leave a restore point alone: it is local by design and never promoted', async () => {
+        staging.list.mockResolvedValue(listing('restore-point-immich-db-backup-1.sql.gz'));
+        remote.list.mockResolvedValue([]);
+
+        await sut.cleanupDatabaseBackups();
+
+        expect(remote.put).not.toHaveBeenCalled();
+        expect(staging.delete).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe('handleBackupDatabase / createDatabaseBackup', () => {
     beforeEach(() => {
-      mocks.storage.readdir.mockResolvedValue([]);
       mocks.process.spawn.mockReturnValue(mockSpawn(0, 'data', ''));
       mocks.process.spawnDuplexStream.mockImplementation(() => mockDuplex()('command', 0, 'data', ''));
-      mocks.storage.rename.mockResolvedValue();
-      mocks.storage.unlink.mockResolvedValue();
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      mocks.storage.createWriteStream.mockReturnValue(new PassThrough());
     });
 
     it('should sanitize DB_URL (remove uselibpqcompat) before calling pg_dumpall', async () => {
@@ -192,14 +290,11 @@ describe(DatabaseBackupService.name, () => {
         mocks.cron as never,
         mocks.job as never,
         void 0 as never,
+        resolver as never,
       );
 
-      mocks.storage.readdir.mockResolvedValue([]);
       mocks.process.spawnDuplexStream.mockImplementation(() => mockDuplex()('command', 0, 'data', ''));
-      mocks.storage.rename.mockResolvedValue();
-      mocks.storage.unlink.mockResolvedValue();
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
-      mocks.storage.createWriteStream.mockReturnValue(new PassThrough());
       mocks.database.getPostgresVersion.mockResolvedValue('14.10');
 
       await sut.handleBackupDatabase();
@@ -219,13 +314,26 @@ describe(DatabaseBackupService.name, () => {
     it('should run a database backup successfully', async () => {
       const result = await sut.handleBackupDatabase();
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.storage.createWriteStream).toHaveBeenCalled();
+      expect(staging.put).toHaveBeenCalledWith(
+        expect.stringMatching(/^backups\/immich-db-backup-.*\.sql\.gz\.tmp$/),
+        expect.anything(),
+        { contentType: 'application/gzip' },
+      );
     });
 
-    it('should rename file on success', async () => {
+    it('should promote the .tmp file to its real name on success', async () => {
       const result = await sut.handleBackupDatabase();
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.storage.rename).toHaveBeenCalled();
+      expect(staging.rename).toHaveBeenCalledWith(
+        expect.stringMatching(/\.sql\.gz\.tmp$/),
+        expect.stringMatching(/\.sql\.gz$/),
+      );
+    });
+
+    it('should not upload anything when no remote is configured', async () => {
+      await sut.handleBackupDatabase();
+      expect(remote.put).not.toHaveBeenCalled();
+      expect(staging.delete).not.toHaveBeenCalled();
     });
 
     it('should fail if pg_dump fails', async () => {
@@ -233,10 +341,10 @@ describe(DatabaseBackupService.name, () => {
       await expect(sut.handleBackupDatabase()).rejects.toThrow('pg_dump non-zero exit code (1)');
     });
 
-    it('should not rename file if pgdump fails and gzip succeeds', async () => {
+    it('should not promote the file if pgdump fails and gzip succeeds', async () => {
       mocks.process.spawnDuplexStream.mockReturnValueOnce(mockDuplex()('pg_dump', 1, '', 'error'));
       await expect(sut.handleBackupDatabase()).rejects.toThrow('pg_dump non-zero exit code (1)');
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(staging.rename).not.toHaveBeenCalled();
     });
 
     it('should fail if gzip fails', async () => {
@@ -245,23 +353,19 @@ describe(DatabaseBackupService.name, () => {
       await expect(sut.handleBackupDatabase()).rejects.toThrow('gzip non-zero exit code (1)');
     });
 
-    it('should fail if write stream fails', async () => {
-      mocks.storage.createWriteStream.mockImplementation(() => {
-        throw new Error('error');
-      });
+    it('should fail if the staging write fails', async () => {
+      staging.put.mockRejectedValue(new Error('error'));
       await expect(sut.handleBackupDatabase()).rejects.toThrow('error');
     });
 
-    it('should destroy the spawned processes if the write stream fails', async () => {
+    it('should destroy the spawned processes if the staging write fails', async () => {
       const spawned: Duplex[] = [];
       mocks.process.spawnDuplexStream.mockImplementation(() => {
         const duplex = mockDuplex()('command', 0, 'data', '');
         spawned.push(duplex);
         return duplex;
       });
-      mocks.storage.createWriteStream.mockImplementation(() => {
-        throw new Error('ENOENT: no such file or directory');
-      });
+      staging.put.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
       await expect(sut.handleBackupDatabase()).rejects.toThrow('ENOENT');
 
@@ -271,16 +375,73 @@ describe(DatabaseBackupService.name, () => {
       }
     });
 
-    it('should fail if rename fails', async () => {
-      mocks.storage.rename.mockRejectedValue(new Error('error'));
+    it('should fail if the promote fails', async () => {
+      staging.rename.mockRejectedValue(new Error('error'));
       await expect(sut.handleBackupDatabase()).rejects.toThrow('error');
     });
 
-    it('should ignore unlink failing and still return failed job status', async () => {
+    it('should delete the .tmp file when the dump fails', async () => {
       mocks.process.spawnDuplexStream.mockReturnValueOnce(mockDuplex()('pg_dump', 1, '', 'error'));
-      mocks.storage.unlink.mockRejectedValue(new Error('error'));
       await expect(sut.handleBackupDatabase()).rejects.toThrow('pg_dump non-zero exit code (1)');
-      expect(mocks.storage.unlink).toHaveBeenCalled();
+      expect(staging.delete).toHaveBeenCalledWith(expect.stringMatching(/\.sql\.gz\.tmp$/));
+    });
+
+    it('should ignore the .tmp delete failing and still surface the dump error', async () => {
+      mocks.process.spawnDuplexStream.mockReturnValueOnce(mockDuplex()('pg_dump', 1, '', 'error'));
+      staging.delete.mockRejectedValue(new Error('error'));
+      await expect(sut.handleBackupDatabase()).rejects.toThrow('pg_dump non-zero exit code (1)');
+      expect(staging.delete).toHaveBeenCalled();
+    });
+
+    describe('the staged promote to S3', () => {
+      beforeEach(() => {
+        enableRemote();
+        staging.list.mockResolvedValue([]);
+        remote.list.mockResolvedValue([]);
+      });
+
+      it('should upload the finished backup and then delete the local copy', async () => {
+        const result = await sut.handleBackupDatabase();
+
+        expect(result).toBe(JobStatus.Success);
+        const [backupKey] = staging.rename.mock.calls[0].slice(1);
+        const filename = backupKey.replace('backups/', '');
+        expect(remote.put).toHaveBeenCalledWith(`nightly/${filename}`, expect.anything(), {
+          contentType: 'application/gzip',
+        });
+        expect(staging.delete).toHaveBeenCalledWith(backupKey);
+      });
+
+      it('should only upload after the dump is complete, never a .tmp key', async () => {
+        await sut.handleBackupDatabase();
+
+        for (const [key] of remote.put.mock.calls) {
+          expect(key).not.toContain('.tmp');
+        }
+      });
+
+      it('should keep the local file and fail the job when the upload fails, naming the bucket', async () => {
+        remote.put.mockRejectedValue(new Error('NoSuchBucket'));
+
+        await expect(sut.handleBackupDatabase()).rejects.toThrow(/db-backups/);
+
+        const [, backupKey] = staging.rename.mock.calls[0];
+        expect(staging.delete).not.toHaveBeenCalledWith(backupKey);
+      });
+
+      it('should still succeed when the local delete fails after a good upload', async () => {
+        staging.delete.mockRejectedValue(new Error('EBUSY'));
+
+        await expect(sut.handleBackupDatabase()).resolves.toBe(JobStatus.Success);
+        expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('failed to delete the local copy'));
+      });
+
+      it('should keep a restore point local, because the restore flow needs it on disk', async () => {
+        await sut.createDatabaseBackup('restore-point-');
+
+        expect(remote.put).not.toHaveBeenCalled();
+        expect(staging.delete).not.toHaveBeenCalled();
+      });
     });
 
     it.each`
@@ -425,6 +586,7 @@ describe(DatabaseBackupService.name, () => {
           mocks.cron as never,
           mocks.job as never,
           void 0 as never,
+          resolver as never,
         );
       });
 
@@ -500,6 +662,7 @@ describe(DatabaseBackupService.name, () => {
           mocks.cron as never,
           mocks.job as never,
           void 0 as never,
+          resolver as never,
         );
       });
 
@@ -563,6 +726,7 @@ describe(DatabaseBackupService.name, () => {
           mocks.cron as never,
           mocks.job as never,
           void 0 as never,
+          resolver as never,
         );
       });
 
@@ -606,6 +770,7 @@ describe(DatabaseBackupService.name, () => {
           mocks.cron as never,
           mocks.job as never,
           void 0 as never,
+          resolver as never,
         );
       });
 
@@ -637,33 +802,95 @@ describe(DatabaseBackupService.name, () => {
 
     it('should write file', async () => {
       await sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never);
-      expect(mocks.storage.createOrOverwriteFile).toBeCalledWith('/data/backups/uploaded-path.sql.gz', 'buffer');
+      expect(staging.put).toBeCalledWith('backups/uploaded-path.sql.gz', 'buffer', {
+        contentType: 'application/gzip',
+      });
+    });
+
+    it('should promote an uploaded backup to S3 like any other', async () => {
+      enableRemote();
+      await sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never);
+      expect(remote.put).toBeCalledWith('nightly/uploaded-path.sql.gz', expect.anything(), {
+        contentType: 'application/gzip',
+      });
+      expect(staging.delete).toBeCalledWith('backups/uploaded-path.sql.gz');
     });
   });
 
   describe('downloadBackup', () => {
-    it('should reject invalid file names', () => {
-      expect(() => sut.downloadBackup('invalid backup')).toThrowError(new BadRequestException('Invalid backup name!'));
+    it('should reject invalid file names', async () => {
+      await expect(sut.downloadBackup('invalid backup')).rejects.toThrowError(
+        new BadRequestException('Invalid backup name!'),
+      );
     });
 
-    it('should get backup path', () => {
-      expect(sut.downloadBackup('hello.sql.gz')).toEqual(
-        expect.objectContaining({
-          path: '/data/backups/hello.sql.gz',
-        }),
+    it('should serve a local backup as a file response', async () => {
+      await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(
+        expect.objectContaining({ path: '/data/backups/hello.sql.gz', contentType: 'application/gzip' }),
       );
+    });
+
+    it('should serve an uncompressed backup as plain sql', async () => {
+      await expect(sut.downloadBackup('hello.sql')).resolves.toEqual(
+        expect.objectContaining({ contentType: 'application/sql' }),
+      );
+    });
+
+    it('should serve from S3 once the local copy has been promoted away', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(false);
+      remote.getServeStrategy.mockResolvedValue({ type: 'redirect', url: 'https://s3/presigned' } as never);
+
+      await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(
+        expect.objectContaining({ url: 'https://s3/presigned' }),
+      );
+      expect(remote.getServeStrategy).toHaveBeenCalledWith('nightly/hello.sql.gz', expect.anything());
+    });
+
+    it('should relay a proxied S3 read as a stream response', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(false);
+      const stream = Readable.from(['payload']);
+      remote.getServeStrategy.mockResolvedValue({ type: 'stream', stream, length: 7 } as never);
+
+      await expect(sut.downloadBackup('hello.sql.gz')).resolves.toEqual(expect.objectContaining({ stream, length: 7 }));
+    });
+
+    it('should prefer the local copy of a backup that is in both places', async () => {
+      enableRemote();
+
+      await sut.downloadBackup('hello.sql.gz');
+
+      expect(staging.getServeStrategy).toHaveBeenCalled();
+      expect(remote.getServeStrategy).not.toHaveBeenCalled();
+    });
+
+    it('should 404 a backup that is in neither place', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(false);
+      remote.exists.mockResolvedValue(false);
+
+      await expect(sut.downloadBackup('hello.sql.gz')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('listBackups', () => {
     it('should give us all backups', async () => {
-      mocks.storage.readdir.mockResolvedValue([
-        `immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
-        `immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
-        'immich-db-backup-1753789649000.sql.gz',
-        `immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+      staging.list.mockResolvedValue([
+        {
+          key: `backups/immich-db-backup-${DateTime.fromISO('2025-07-25T11:02:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz.tmp`,
+          size: 1024,
+        },
+        {
+          key: `backups/immich-db-backup-${DateTime.fromISO('2025-07-27T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+          size: 1024,
+        },
+        { key: 'backups/immich-db-backup-1753789649000.sql.gz', size: 1024 },
+        {
+          key: `backups/immich-db-backup-${DateTime.fromISO('2025-07-29T11:01:16Z').toFormat("yyyyLLdd'T'HHmmss")}-v1.234.5-pg14.5.sql.gz`,
+          size: 1024,
+        },
       ]);
-      mocks.storage.stat.mockResolvedValue({ size: 1024 } as any);
 
       await expect(sut.listBackups()).resolves.toMatchObject({
         backups: [
@@ -672,6 +899,40 @@ describe(DatabaseBackupService.name, () => {
           { filename: 'immich-db-backup-1753789649000.sql.gz', filesize: 1024 },
         ],
       });
+    });
+
+    it('should union both backends, deduplicated by filename', async () => {
+      enableRemote();
+      remote.list.mockResolvedValue([
+        { key: 'nightly/immich-db-backup-1.sql.gz', size: 10 },
+        { key: 'nightly/immich-db-backup-2.sql.gz', size: 20 },
+      ]);
+      staging.list.mockResolvedValue([{ key: 'backups/immich-db-backup-3.sql.gz', size: 30 }]);
+
+      await expect(sut.listBackups()).resolves.toMatchObject({
+        backups: [
+          { filename: 'immich-db-backup-3.sql.gz', filesize: 30 },
+          { filename: 'immich-db-backup-2.sql.gz', filesize: 20 },
+          { filename: 'immich-db-backup-1.sql.gz', filesize: 10 },
+        ],
+      });
+    });
+
+    it('should report the local size for a backup still awaiting its upload', async () => {
+      enableRemote();
+      remote.list.mockResolvedValue([{ key: 'nightly/immich-db-backup-1.sql.gz', size: 10 }]);
+      staging.list.mockResolvedValue([{ key: 'backups/immich-db-backup-1.sql.gz', size: 99 }]);
+
+      await expect(sut.listBackups()).resolves.toMatchObject({
+        backups: [{ filename: 'immich-db-backup-1.sql.gz', filesize: 99 }],
+      });
+    });
+
+    it('should ignore objects under the prefix that are not backups', async () => {
+      enableRemote();
+      remote.list.mockResolvedValue([{ key: 'nightly/notes.txt', size: 5 }]);
+
+      await expect(sut.listBackups()).resolves.toEqual({ backups: [] });
     });
   });
 
@@ -682,25 +943,25 @@ describe(DatabaseBackupService.name, () => {
       );
     });
 
-    it('should unlink the target file', async () => {
+    it('should delete the target file', async () => {
       await sut.deleteBackup(['filename.sql']);
-      expect(mocks.storage.unlink).toHaveBeenCalledTimes(1);
-      expect(mocks.storage.unlink).toHaveBeenCalledWith(
-        `${StorageCore.getBaseFolder(StorageFolder.Backups)}/filename.sql`,
-      );
+      expect(staging.delete).toHaveBeenCalledTimes(1);
+      expect(staging.delete).toHaveBeenCalledWith('backups/filename.sql');
+    });
+
+    it('should delete from both backends, wherever the backup actually is', async () => {
+      enableRemote();
+      await sut.deleteBackup(['filename.sql']);
+      expect(staging.delete).toHaveBeenCalledWith('backups/filename.sql');
+      expect(remote.delete).toHaveBeenCalledWith('nightly/filename.sql');
     });
   });
 
   describe('restoreDatabaseBackup', () => {
     beforeEach(() => {
-      mocks.storage.readdir.mockResolvedValue([]);
       mocks.process.spawn.mockReturnValue(mockSpawn(0, 'data', ''));
       mocks.process.spawnDuplexStream.mockImplementation(() => mockDuplex()('command', 0, 'data', ''));
       mocks.process.fork.mockImplementation(() => mockSpawn(0, 'Immich Server is listening', ''));
-      mocks.storage.rename.mockResolvedValue();
-      mocks.storage.unlink.mockResolvedValue();
-      mocks.storage.createPlainReadStream.mockReturnValue(Readable.from(mockData()));
-      mocks.storage.createWriteStream.mockReturnValue(new PassThrough());
       mocks.storage.createGzip.mockReturnValue(new PassThrough());
       mocks.storage.createGunzip.mockReturnValue(new PassThrough());
 
@@ -733,6 +994,7 @@ describe(DatabaseBackupService.name, () => {
         mocks.cron as never,
         mocks.job as never,
         maintenanceHealthRepositoryMock,
+        resolver as never,
       );
     });
 
@@ -937,6 +1199,50 @@ describe(DatabaseBackupService.name, () => {
       expect(mocks.user.hasAdmin).toHaveBeenCalled();
       expect(maintenanceHealthRepositoryMock.checkApiHealth).toHaveBeenCalled();
       expect(mocks.process.spawnDuplexStream).toHaveBeenCalledTimes(4);
+    });
+
+    // The abstraction is what makes this possible at all: a backup that has been promoted only exists
+    // in the bucket, and restoring reads it straight from there with no separate download step.
+    it('should restore a backup that only exists in S3', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(false);
+      mocks.user.hasAdmin.mockResolvedValue(true);
+
+      await sut.restoreDatabaseBackup('development-filename.sql');
+
+      expect(remote.get).toHaveBeenCalledWith('nightly/development-filename.sql');
+      expect(maintenanceHealthRepositoryMock.checkApiHealth).toHaveBeenCalled();
+    });
+
+    it('should reject a backup that is in neither place', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(false);
+      remote.exists.mockResolvedValue(false);
+
+      await expect(sut.restoreDatabaseBackup('development-filename.sql')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('should read the rollback restore point from the staging disk, never from S3', async () => {
+      enableRemote();
+      staging.exists.mockResolvedValue(true);
+      mocks.user.hasAdmin.mockResolvedValue(false);
+
+      await expect(sut.restoreDatabaseBackup('development-filename.sql')).rejects.toThrow('no admin exists');
+
+      expect(staging.get).toHaveBeenCalledWith(expect.stringMatching(/^backups\/restore-point-/));
+      expect(remote.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onConfigValidate', () => {
+    it('should refuse to enable S3 backups while the storage backend is disk', () => {
+      expect(() => sut.onConfigValidate({ newConfig: configWithS3(true), oldConfig: defaults })).toThrow(
+        /S3 storage backend/,
+      );
+    });
+
+    it('should allow the default config', () => {
+      expect(() => sut.onConfigValidate({ newConfig: defaults, oldConfig: defaults })).not.toThrow();
     });
   });
 });

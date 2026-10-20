@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import z from 'zod';
 import { AdminConfigDto, defaults, mapPublicConfig, mapUserConfig } from 'src/dtos/config.dto.js';
 import {
+  GalleryBackupS3Schema,
   GalleryClassificationSchema,
   GalleryFaceSuggestionSchema,
   GalleryMemoriesSchema,
@@ -66,6 +67,18 @@ describe('gallery config fragments', () => {
   it('does not inherit a user-visible enabled leaf on pet detection', () => {
     expect(z.globalRegistry.get(GalleryPetDetectionSchema.shape.enabled)?.visibility).toBeUndefined();
   });
+
+  it('coerces the backup S3 enabled flag from an IMMICH_CONFIG_FILE string boolean', () => {
+    const parsed = GalleryBackupS3Schema.parse({ enabled: 'true', bucket: '', prefix: 'db/' });
+    expect(parsed.enabled).toBe(true);
+  });
+
+  // Credentials, region and endpoint are deliberately absent: the feature is only offered on the S3
+  // storage backend, so the only ones that could apply are the media backend's. Keeping them out is
+  // what keeps secrets out of the database and out of GET /admin/config, which redacts nothing.
+  it('carries no credentials, region or endpoint', () => {
+    expect(Object.keys(GalleryBackupS3Schema.shape).toSorted()).toEqual(['bucket', 'enabled', 'prefix']);
+  });
 });
 
 describe('fork config survives schema composition', () => {
@@ -91,6 +104,10 @@ describe('fork config survives schema composition', () => {
     expect(parsed.machineLearning.clip.maxDistance).toBe(0);
     expect(parsed.machineLearning.facialRecognition.suggestions).toEqual({ enabled: true, maxDistance: 0.7 });
     expect(parsed.machineLearning.petDetection).toEqual({ enabled: false, modelName: 'rfdetr-nano', minScore: 0.3 });
+  });
+
+  it('keeps the fork database-backup S3 block', () => {
+    expect(parsed.backup.database.s3).toEqual({ enabled: false, bucket: '', prefix: 'immich-db-backups/' });
   });
 
   it('keeps the fork server flag and job concurrencies', () => {
@@ -125,6 +142,8 @@ describe('fork config is admin-only', () => {
     'suggestions',
     'mergePeopleAcrossOwners',
     'maxDistance',
+    // the backup bucket and prefix are admin-only infrastructure detail, like the rest of `backup`
+    's3',
   ];
 
   it.each([

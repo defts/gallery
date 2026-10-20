@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageBackend, S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
@@ -7,6 +8,8 @@ import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { getConfig } from 'src/utils/config.js';
 
 /**
  * Where a database backup lives.
@@ -30,15 +33,6 @@ export interface BackupStore {
   };
 }
 
-type BackupStoreDependencies = {
-  configRepository: ConfigRepository;
-  storageRepository: StorageRepository;
-  logger: LoggingRepository;
-  getConfig: () => Promise<SystemConfig>;
-  /** Seam for tests: production builds a real `S3StorageBackend`. */
-  createS3Backend?: (config: S3StorageConfig) => StorageBackend;
-};
-
 /** Trailing slash normalised so `<prefix><filename>` is always a well-formed key. */
 export const normalizeBackupPrefix = (prefix: string): string => {
   const trimmed = prefix.replace(/^\/+/, '').trim();
@@ -54,10 +48,7 @@ export const normalizeBackupPrefix = (prefix: string): string => {
  * would not survive. Without this an admin could reach a state over the API that the UI never offers,
  * because the UI hides the whole group when the storage backend is not S3.
  */
-export const validateBackupS3Config = (
-  newConfig: SystemConfig,
-  env: { storage: { backend: 'disk' | 's3' } },
-): void => {
+export const validateBackupS3Config = (newConfig: SystemConfig, env: { storage: { backend: 'disk' | 's3' } }): void => {
   if (newConfig.backup.database.s3.enabled && env.storage.backend !== 's3') {
     throw new Error(
       'Database backups can only be uploaded to S3 while the server is running on the S3 storage backend. Set IMMICH_STORAGE_BACKEND=s3 first, or leave this off.',
@@ -66,26 +57,43 @@ export const validateBackupS3Config = (
 };
 
 /**
- * Plain class, not an `@Injectable` (the `BackendMediaServer` precedent): built once in
- * `DatabaseBackupService`'s constructor from deps it already has. `resolve()` reads the config fresh
- * on every call so an admin edit applies without restarting the server; the S3 client itself is cached
- * and only rebuilt when the resolved settings change.
+ * Resolves where the next database backup goes. `resolve()` reads the config fresh on every call, so an
+ * admin edit applies without restarting the server; only the S3 client is cached, and it is rebuilt
+ * when the resolved settings change.
+ *
+ * A provider rather than a static, so the backup service can be given a stub, and so the S3 client is
+ * owned by something with a lifecycle rather than by module scope.
  */
+@Injectable()
 export class BackupStoreResolver {
   private cached?: { signature: string; backend: StorageBackend };
   private warned?: string;
+  /** Overridden in tests so no real S3 client is built. */
+  protected createS3Backend: (config: S3StorageConfig) => StorageBackend = (config) => new S3StorageBackend(config);
 
-  constructor(private deps: BackupStoreDependencies) {}
+  constructor(
+    private readonly configRepository: ConfigRepository,
+    private readonly storageRepository: StorageRepository,
+    private readonly systemMetadataRepository: SystemMetadataRepository,
+    private readonly logger: LoggingRepository,
+  ) {}
 
   async resolve(): Promise<BackupStore> {
-    const staging = new DiskStorageBackend(StorageCore.getMediaLocation(), this.deps.storageRepository);
+    const staging = new DiskStorageBackend(StorageCore.getMediaLocation(), this.storageRepository);
     const stagingFolder = StorageFolder.Backups;
     const store: BackupStore = {
       staging,
       stagingKey: (filename: string) => `${stagingFolder}/${filename}`,
     };
 
-    const config = await this.deps.getConfig();
+    const config = await getConfig(
+      {
+        configRepo: this.configRepository,
+        metadataRepo: this.systemMetadataRepository,
+        logger: this.logger,
+      },
+      { withCache: false },
+    );
     const s3Settings = config.backup.database.s3;
     if (!s3Settings.enabled) {
       return store;
@@ -94,7 +102,7 @@ export class BackupStoreResolver {
     // Degrade to local-only rather than failing the backup: an admin who sets IMMICH_STORAGE_BACKEND
     // back to disk should still get backups, and the ConfigValidate guard already stops this state
     // being reached by a save.
-    const env = this.deps.configRepository.getEnv();
+    const env = this.configRepository.getEnv();
     if (env.storage.backend !== 's3') {
       this.warnOnce(
         'local-backend',
@@ -129,9 +137,8 @@ export class BackupStoreResolver {
     // secret is not included, since a signature is a cache key and nothing more.
     const signature = JSON.stringify([config.bucket, config.region, config.endpoint, config.accessKeyId, prefix]);
     if (this.cached?.signature !== signature) {
-      const createS3Backend = this.deps.createS3Backend ?? ((c: S3StorageConfig) => new S3StorageBackend(c));
-      this.cached = { signature, backend: createS3Backend(config) };
-      this.deps.logger.log(`Database backups will be uploaded to S3 (bucket: ${config.bucket}, prefix: ${prefix})`);
+      this.cached = { signature, backend: this.createS3Backend(config) };
+      this.logger.log(`Database backups will be uploaded to S3 (bucket: ${config.bucket}, prefix: ${prefix})`);
     }
     return this.cached.backend;
   }
@@ -142,6 +149,6 @@ export class BackupStoreResolver {
       return;
     }
     this.warned = reason;
-    this.deps.logger.warn(message);
+    this.logger.warn(message);
   }
 }
