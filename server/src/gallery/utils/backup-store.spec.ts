@@ -1,9 +1,12 @@
+import { Reflector } from '@nestjs/core';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { MaintenanceModule } from 'src/app.module.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { S3StorageConfig } from 'src/backends/s3-storage.backend.js';
 import { SystemConfig, defaults } from 'src/dtos/config.dto.js';
 import { BackupStoreResolver, normalizeBackupPrefix, validateBackupS3Config } from 'src/gallery/utils/backup-store.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import { DatabaseBackupService } from 'src/services/database-backup.service.js';
 import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { ServiceMocks, getMocks } from 'test/utils.js';
 
@@ -210,5 +213,34 @@ describe('validateBackupS3Config', () => {
 
   it('allows a disk-backed server to leave S3 backups off', () => {
     expect(() => validateBackupS3Config(configWith(false), { storage: { backend: 'disk' } })).not.toThrow();
+  });
+});
+
+/**
+ * The maintenance worker lists its providers explicitly rather than spreading `services`, so a new
+ * dependency on `DatabaseBackupService` has to be named there as well. Missing it is a boot failure
+ * in the restore flow only — no type check and no other spec would catch it.
+ */
+describe('maintenance worker wiring', () => {
+  // `Reflector` rather than `Reflect.getMetadata` directly: same lookup, without reaching for a
+  // non-standard builtin property the lint rules reject.
+  const reflector = new Reflector();
+  const providers = () => reflector.get<unknown[]>('providers', MaintenanceModule) ?? [];
+
+  it('provides every non-optional dependency DatabaseBackupService injects', () => {
+    const provided = new Set(providers());
+    const paramTypes = reflector.get<unknown[]>('design:paramtypes', DatabaseBackupService) ?? [];
+    const optional = new Set(reflector.get<number[]>('optional:paramtypes', DatabaseBackupService));
+
+    const unprovided = paramTypes
+      .map((type, index) => ({ type, index }))
+      .filter(({ type, index }) => !optional.has(index) && !provided.has(type))
+      .map(({ type }) => (type as { name?: string })?.name ?? 'unknown');
+
+    expect(unprovided).toEqual([]);
+  });
+
+  it('provides the backup store resolver', () => {
+    expect(providers()).toContain(BackupStoreResolver);
   });
 });

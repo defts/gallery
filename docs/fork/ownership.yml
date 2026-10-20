@@ -172,6 +172,7 @@ features:
       - server/src/dtos/server.dto.ts
       - server/src/services/server.service.ts
       - server/src/services/server.service.spec.ts
+      - server/src/app.module.ts
       - web/src/routes/admin/system-settings/BackupSettings.svelte
       - web/src/routes/admin/system-settings/BackupSettings.spec.ts
       - mobile/lib/utils/openapi_patching.dart
