@@ -37,6 +37,11 @@ describe('celebrate', () => {
     expect(document.querySelector('[data-gallery-celebration]')).toBeNull();
   });
 
+  it('treats a matchMedia that returns nothing as motion allowed', () => {
+    vi.spyOn(globalThis, 'matchMedia').mockReturnValue(undefined as unknown as MediaQueryList);
+    expect(() => celebrate('success', { x: 0, y: 0 })).not.toThrow();
+  });
+
   it('respects reduced motion', () => {
     vi.spyOn(globalThis, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
     celebrate('success', { x: 0, y: 0 });

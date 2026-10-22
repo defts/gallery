@@ -63,5 +63,6 @@ export const springEasing = (token: SpringToken): string => {
   return linearSupported ? token.easing : ease.settle;
 };
 
+/** Defensive about `matchMedia`: some environments (and test stubs) return nothing from it. */
 export const prefersReducedMotion = (): boolean =>
-  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  typeof matchMedia === 'function' && !!matchMedia('(prefers-reduced-motion: reduce)')?.matches;

@@ -5,7 +5,6 @@ import { installPressFeedback } from '$lib/gallery/motion/press';
 import { installTilt } from '$lib/gallery/motion/tilt';
 
 export { celebrate, pop } from '$lib/gallery/motion/celebrate';
-export { revealMotion } from '$lib/gallery/motion/reveal';
 export { animateRemoval, type RemovalKind, type RemovalTarget } from '$lib/gallery/motion/removal';
 export { duration, ease, spring, springEasing } from '$lib/gallery/motion/tokens';
 

@@ -315,6 +315,14 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
   }
 }
 
+/* Fork content that appears inline (a suggestion banner): fades and drops into place. Opt in with
+ * `data-motion-reveal`; CSS rather than a Svelte transition, so nothing waits on it to unmount. */
+[data-motion-reveal] {
+  animation:
+    gallery-fade-in var(--motion-base) var(--ease-standard),
+    gallery-drop-in var(--spring-gentle-duration) var(--spring-gentle);
+}
+
 /* The selection bar slides down over the top bar when photos are selected. */
 #control-bar {
   animation:
@@ -388,7 +396,8 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
 
   #sidebar div.relative.flex + div,
   #sidebar div.relative.flex > button.absolute svg,
-  #control-bar {
+  #control-bar,
+  [data-motion-reveal] {
     animation: none;
   }
 
