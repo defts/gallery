@@ -228,6 +228,74 @@
   scale: 1.1;
 }
 
+/* Explore: place photos drift closer inside their frames and brighten; people grow a hair. Matched
+ * by link target because the page is upstream's. Person tiles have their own lift (excluded). */
+a[href*='city='] .overflow-hidden > img.object-cover {
+  transition: scale var(--motion-slow) var(--ease-settle);
+}
+
+a[href*='city='] .brightness-75 {
+  transition: filter var(--motion-base) var(--ease-standard);
+}
+
+a[href*='city=']:hover .overflow-hidden > img.object-cover {
+  scale: 1.06;
+}
+
+a[href*='city=']:hover .brightness-75 {
+  filter: brightness(0.9);
+}
+
+a[href*='/people/']:not(:has([data-motion-lift])) img.rounded-full {
+  transition: scale var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
+  scale: 1.04;
+}
+
+/* Sidebar groups (Spaces, Albums): children slide down into place and the chevron turns, instead of
+ * both snapping. @immich/ui renders the children as the sibling right after the item's row, so
+ * `:has(+ div)` tells an expanded row from a collapsed one. */
+#sidebar div.relative.flex:has(> button.absolute) + div {
+  animation:
+    gallery-fade-in var(--motion-base) var(--ease-standard),
+    gallery-drop-in var(--motion-base) var(--ease-settle);
+}
+
+#sidebar div.relative.flex:has(+ div) > button.absolute svg {
+  animation: gallery-turn-down var(--spring-snappy-duration) var(--spring-snappy);
+}
+
+#sidebar div.relative.flex:not(:has(+ div)) > button.absolute svg {
+  animation: gallery-turn-right var(--spring-snappy-duration) var(--spring-snappy);
+}
+
+@keyframes gallery-drop-in {
+  from {
+    translate: 0 -6px;
+  }
+}
+
+@keyframes gallery-turn-down {
+  from {
+    rotate: -90deg;
+  }
+}
+
+@keyframes gallery-turn-right {
+  from {
+    rotate: 90deg;
+  }
+}
+
+/* The selection bar slides down over the top bar when photos are selected. */
+#control-bar {
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-drop-in var(--spring-gentle-duration) var(--spring-gentle);
+}
+
 /* ── Layout transitions: pages crossfade (page-transition.ts) ────────── */
 
 #sidebar {
@@ -279,6 +347,17 @@
   :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square),
   #sidebar a[class~='rounded-e-full']:hover svg {
     translate: none;
+    scale: none;
+  }
+
+  #sidebar div.relative.flex + div,
+  #sidebar div.relative.flex > button.absolute svg,
+  #control-bar {
+    animation: none;
+  }
+
+  a[href*='city=']:hover .overflow-hidden > img.object-cover,
+  a[href*='/people/']:hover img.rounded-full {
     scale: none;
   }
 
