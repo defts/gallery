@@ -1,0 +1,289 @@
+/* web/src/lib/gallery/motion/motion.css
+ * Gallery motion language, CSS half. Imported by src/styles/gallery-theme.css.
+ * Design: specs/2026-10-23-web-motion-language-design.md. The values mirror tokens.ts
+ * (tokens.spec.ts fails when they drift).
+ *
+ * Rules here are unlayered so they beat Tailwind utilities (duration-100 etc.) on the
+ * upstream and @immich/ui components they retime. They only touch timing, opacity and
+ * the individual `scale` property, never layout.
+ */
+
+:root {
+  --motion-instant: 90ms;
+  --motion-quick: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 400ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  --spring-gentle: linear(
+    0,
+    0.07,
+    0.23,
+    0.424,
+    0.614,
+    0.776,
+    0.901,
+    0.989,
+    1.042,
+    1.069,
+    1.076,
+    1.07,
+    1.058,
+    1.043,
+    1.029,
+    1.017,
+    1.007,
+    1.001,
+    0.997,
+    0.995,
+    0.994,
+    0.995,
+    0.996,
+    0.997,
+    1
+  );
+  --spring-gentle-duration: 560ms;
+  --spring-snappy: linear(
+    0,
+    0.081,
+    0.26,
+    0.465,
+    0.653,
+    0.806,
+    0.916,
+    0.988,
+    1.028,
+    1.045,
+    1.048,
+    1.042,
+    1.033,
+    1.023,
+    1.015,
+    1.008,
+    1.003,
+    1,
+    0.998,
+    0.998,
+    1
+  );
+  --spring-snappy-duration: 360ms;
+  --spring-bouncy: linear(
+    0,
+    0.124,
+    0.405,
+    0.723,
+    0.991,
+    1.165,
+    1.238,
+    1.23,
+    1.172,
+    1.095,
+    1.024,
+    0.973,
+    0.946,
+    0.941,
+    0.952,
+    0.97,
+    0.988,
+    1.003,
+    1.011,
+    1.014,
+    1.013,
+    1.009,
+    1.004,
+    1,
+    0.998,
+    0.997,
+    0.997,
+    0.997,
+    1
+  );
+  --spring-bouncy-duration: 780ms;
+}
+
+@keyframes gallery-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes gallery-scale-in {
+  from {
+    scale: 0.94;
+  }
+}
+
+@keyframes gallery-scale-in-small {
+  from {
+    scale: 0.96;
+  }
+}
+
+@keyframes gallery-pop {
+  from {
+    scale: 0.4;
+  }
+}
+
+/* ── Keyframes: entrances ─────────────────────────────────────────────── */
+
+/* Modals: the backdrop fades, the card springs up from slightly small. */
+[data-dialog-overlay][data-state='open'] {
+  animation: gallery-fade-in var(--motion-base) var(--ease-standard);
+}
+
+[data-dialog-content][data-state='open'] {
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-scale-in var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+/* Menus, popovers and selects grow out of the control that opened them. */
+[data-menu-content][data-state='open'],
+[data-popover-content][data-state='open'],
+[data-select-content][data-state='open'] {
+  transform-origin: var(--bits-floating-transform-origin, top);
+  animation:
+    gallery-fade-in var(--motion-quick) var(--ease-standard),
+    gallery-scale-in-small var(--motion-base) var(--ease-settle);
+}
+
+[data-tooltip-content] {
+  animation: gallery-fade-in var(--motion-quick) var(--ease-standard);
+}
+
+/* ── Springs: toggles and selection ───────────────────────────────────── */
+
+/* @immich/ui Switch: the thumb slides and grows (scale-150) on a spring instead of 100ms linear. */
+[data-switch-thumb] {
+  transition-duration: var(--spring-snappy-duration);
+  transition-timing-function: var(--spring-snappy);
+}
+
+/* Timeline thumbnail selection: the photo shrinks into its frame with a little give. */
+[data-thumbnail-focus-container] .transition-transform {
+  transition-duration: var(--spring-gentle-duration);
+  transition-timing-function: var(--spring-gentle);
+}
+
+/* The check pops when a press selects something. `data-just-pressed` is set by press.ts for a
+ * moment after a press, so checks that are already on when a page renders stay still. */
+[role='checkbox'][aria-checked='true'][data-just-pressed] [data-icon-select],
+[role='checkbox'][data-state='checked'][data-just-pressed] svg {
+  animation: gallery-pop var(--spring-bouncy-duration) var(--spring-bouncy);
+}
+
+/* ── Hover: cards lift, chrome eases ──────────────────────────────────
+ * Hovering a card lifts its picture a few pixels with a softer shadow; leaving lets it settle.
+ * Fork components opt in with `data-motion-lift` (and `data-motion-lift-group` on the hover area);
+ * upstream's album card is matched by its test id, so its file stays untouched. */
+
+[data-testid='album-card'],
+[data-testid='space-card'] {
+  transition:
+    background-color var(--motion-quick) var(--ease-standard),
+    border-color var(--motion-quick) var(--ease-standard);
+}
+
+[data-motion-lift],
+[data-testid='album-card'] img.aspect-square {
+  transition:
+    translate var(--motion-base) var(--ease-settle),
+    box-shadow var(--motion-base) var(--ease-settle);
+}
+
+:is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
+  translate: 0 -3px;
+  box-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.35);
+}
+
+/* Round pictures (people) would show a square shadow: they lift and grow a hair instead. */
+[data-motion-lift-group]:hover [data-motion-lift='flat'][data-motion-lift] {
+  box-shadow: none;
+  scale: 1.03;
+}
+
+[data-motion-lift='flat'] {
+  transition:
+    translate var(--motion-base) var(--ease-settle),
+    scale var(--spring-gentle-duration) var(--spring-gentle);
+}
+
+/* Sidebar items: the pill fades in rather than snapping, and the icon leans in a touch. */
+#sidebar a[class~='rounded-e-full'] {
+  transition:
+    background-color var(--motion-quick) var(--ease-standard),
+    color var(--motion-quick) var(--ease-standard),
+    padding 100ms 100ms;
+}
+
+#sidebar a[class~='rounded-e-full'] svg {
+  transition: scale var(--spring-snappy-duration) var(--spring-snappy);
+}
+
+#sidebar a[class~='rounded-e-full']:hover svg {
+  scale: 1.1;
+}
+
+/* ── Layout transitions: pages crossfade (page-transition.ts) ────────── */
+
+#sidebar {
+  view-transition-name: gallery-sidebar;
+}
+
+#dashboard-navbar {
+  view-transition-name: gallery-navbar;
+}
+
+::view-transition-old(root) {
+  animation: var(--motion-quick) var(--ease-exit) both gallery-fade-out;
+}
+
+::view-transition-new(root) {
+  animation:
+    var(--motion-base) var(--ease-standard) both gallery-fade-in,
+    var(--spring-gentle-duration) var(--spring-gentle) both gallery-rise-in;
+}
+
+@keyframes gallery-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gallery-rise-in {
+  from {
+    translate: 0 8px;
+  }
+}
+
+/* ── Reduced motion: keep fades (they carry meaning), drop movement ──── */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-dialog-content][data-state='open'],
+  [data-menu-content][data-state='open'],
+  [data-popover-content][data-state='open'],
+  [data-select-content][data-state='open'] {
+    animation: gallery-fade-in var(--motion-quick) linear;
+  }
+
+  [data-switch-thumb],
+  [data-thumbnail-focus-container] .transition-transform,
+  #sidebar a[class~='rounded-e-full'] svg {
+    transition-duration: 0ms;
+  }
+
+  :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square),
+  #sidebar a[class~='rounded-e-full']:hover svg {
+    translate: none;
+    scale: none;
+  }
+
+  [role='checkbox'][data-just-pressed] [data-icon-select],
+  [role='checkbox'][data-just-pressed] svg {
+    animation: none;
+  }
+}
