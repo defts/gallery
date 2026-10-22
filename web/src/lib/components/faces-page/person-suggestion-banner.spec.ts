@@ -1,6 +1,6 @@
 import type { PersonFaceSuggestionResponseDto, PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
@@ -44,7 +44,12 @@ const base = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('PersonSuggestionBanner', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // happy-dom never finishes Web Animations, so the banner's slide-out would hold it in the DOM;
+    // reduced motion makes the slide instant, which is the path these tests need.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce'), media: query }));
+  });
   afterEach(async () => {
     await new Promise((r) => setTimeout(r, 50));
   });
@@ -77,7 +82,7 @@ describe('PersonSuggestionBanner', () => {
   it('Not now snoozes and hides the banner', async () => {
     render(PersonSuggestionBanner, { props: base() });
     await userEvent.click(screen.getByTestId('suggestion-snooze-btn'));
-    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
   });
 
   it('stays hidden while snoozed at the same count but reappears when the count grows', () => {
@@ -97,7 +102,7 @@ describe('PersonSuggestionBanner', () => {
   it('keys snooze on the snoozeId prop, not on person.id, when the two differ', async () => {
     render(PersonSuggestionBanner, { props: base({ snoozeId: 'suggestion-target-id' }) });
     await userEvent.click(screen.getByTestId('suggestion-snooze-btn'));
-    expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
 
     // Snoozed under 'suggestion-target-id' (the prop), so a banner for the SAME person.id but a DIFFERENT
     // snoozeId must still show — the person's own id was never the key.
