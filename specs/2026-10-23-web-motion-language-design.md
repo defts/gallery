@@ -17,16 +17,18 @@ by taste.
 
 | Interaction                                | Family                     | Treatment                                                                                                | Where it lives                                    |
 | ------------------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Pressing any control                       | Spring                     | Squish ~5px while held (`pressScale`), spring back on release with slight overshoot                      | `press.ts`, site-wide                             |
+| Pressing any control                       | Spring                     | Squish ~14px while held (`pressScale`, 0.86–0.95); a tap waits for the dip to land, then the bouncy spring returns it | `press.ts`, site-wide                             |
 | Toggling (switch, checkbox, select)        | Spring                     | Switch thumb on the snappy spring; checks pop in on the bouncy spring when a press turned them on        | `motion.css`                                      |
 | Selecting a photo                          | Spring + layout            | Photo shrinks into its frame on the gentle spring; the check pops                                         | `motion.css`                                      |
-| Something appearing (modal, menu, popover) | Keyframes                  | Fade + scale from 94–96%; modals spring, menus grow from their trigger (`--bits-floating-transform-origin`) | `motion.css`                                   |
-| Hovering a card                            | Keyframes (transition)     | Picture lifts 3px with a softer shadow; card background eases instead of snapping                         | `motion.css`, `data-motion-lift`                  |
-| Hovering a sidebar item                    | Spring                     | Pill fades in; icon grows 10% on the snappy spring                                                       | `motion.css`                                      |
-| Hovering Explore places / people          | Keyframes (transition)     | Place photos zoom 6% inside their frame and brighten; avatars grow 4% on a spring                         | `motion.css` (matched by link target)             |
-| Expanding a sidebar group (Spaces, Albums) | Spring + keyframes         | Children fade and drop 6px into place; the chevron turns on the snappy spring                            | `motion.css`                                      |
-| Selecting photos (selection bar)           | Spring                     | The selection bar fades and drops in over the top bar                                                    | `motion.css`                                      |
-| Changing section                           | Layout transition          | View Transition crossfade with an 8px rise; sidebar and top bar held still                               | `page-transition.ts`, `motion.css`                |
+| Something appearing (modal, menu, popover) | Keyframes                  | Modals rise 32px from 82% on the bouncy spring; menus grow from 85% out of their trigger (`--bits-floating-transform-origin`) | `motion.css`                                   |
+| Hovering a button                          | Spring                     | Grows ~5px (`hoverScale`, 1.02–1.1) on the bouncy spring; mouse only; menu rows, tabs and checkboxes highlight instead | `press.ts`, site-wide |
+| Hovering a timeline photo                  | Keyframes (transition)     | The photo zooms 10% inside its frame (not while selected)                                                | `motion.css`                                      |
+| Hovering a card                            | Spring                     | Picture lifts 8px and grows 4% with a deeper shadow; the card rises above its neighbours                  | `motion.css`, `data-motion-lift`                  |
+| Hovering a sidebar item                    | Spring                     | Pill fades in; icon grows 25% and tilts 8° on the bouncy spring                                          | `motion.css`                                      |
+| Hovering Explore places / people          | Keyframes (transition)     | Place photos zoom 12% inside their frame and brighten; avatars grow 8% on the bouncy spring               | `motion.css` (matched by link target)             |
+| Expanding a sidebar group (Spaces, Albums) | Spring + keyframes         | Children fade and drop 16px into place; the chevron turns on the snappy spring                           | `motion.css`                                      |
+| Selecting photos (selection bar)           | Spring                     | The selection bar fades and drops 16px in over the top bar on the bouncy spring                          | `motion.css`                                      |
+| Changing section                           | Layout transition          | View Transition: old page fades and sinks to 98%, new one rises 28px; sidebar and top bar held still      | `page-transition.ts`, `motion.css`                |
 | Trashing / archiving / restoring photos    | SVG-style path + physics   | Each photo lifts (anticipation), then arcs along a Bézier into the sidebar link it went to, which gulps   | `removal.ts`                                      |
 | Deleting permanently / emptying trash      | Shader-style               | Photos lose colour, blur and dissolve where they stood                                                    | `removal.ts`                                      |
 | Favoriting                                 | Particles                  | A ring and seven small hearts burst from the button                                                       | `celebrate.ts`                                    |
@@ -73,8 +75,10 @@ console.log(Math.round(T * 1000), `linear(${Array.from({ length: n + 1 }, (_, i)
 
 ## Rules
 
-1. **Restraint.** Scale stays within 0.92–1.1 for controls. One overshoot, no wobble loops. Celebrations
-   are for rare, positive, user-initiated moments; a burst on every click stops being a reward.
+1. **Noticeable, not noisy.** The first wave was so restrained that nobody saw it, so everyday motion is
+   tuned to be felt on a normal click: controls scale within 0.86–1.1, releases and hovers overshoot once
+   on the bouncy spring, no wobble loops. Celebrations stay rare, positive and user-initiated; a burst on
+   every click stops being a reward.
 2. **Never block.** Nothing the user waits on runs past `--motion-slow`. Removals copy what is on screen
    into a `pointer-events: none` overlay, so the timeline reflows and stays usable underneath.
 3. **Start from the user.** Bursts and fallback throws start or end at the last pointer press. Keyboard
@@ -84,7 +88,10 @@ console.log(Math.round(T * 1000), `linear(${Array.from({ length: n + 1 }, (_, i)
 5. **Only `scale`, `translate`, `opacity`, `filter`, colours.** Never layout properties. The individual
    transform properties compose with Tailwind's (`scale-*` is the `scale` property in v4), and press
    animations use `composite: 'add'` so they multiply onto a component's own scale.
-6. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
+6. **No permanent stacking contexts on chrome.** A `view-transition-name`, `translate` or `scale` on an
+   element traps its dropdowns under later content. Name the sidebar and top bar only while a crossfade
+   runs (`gallery-page-transition` class), and raise a hovered card (`z-index: 1`) while it is lifted.
+7. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
    the fork-owned `gallery-theme.css`. Upstream components are reached by stable hooks they already
    expose (bits-ui `data-*-content`/`data-state`, `data-thumbnail-focus-container`, `data-testid`,
    `#sidebar`) rather than by editing them. Fork components opt in with attributes
