@@ -205,6 +205,7 @@
   transition:
     translate var(--spring-gentle-duration) var(--spring-gentle),
     scale var(--spring-gentle-duration) var(--spring-gentle),
+    transform var(--motion-slow) var(--ease-settle),
     box-shadow var(--motion-base) var(--ease-settle);
 }
 
@@ -216,6 +217,9 @@
 :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
   translate: 0 -8px;
   scale: 1.04;
+  /* tilt.ts sets the angles from the mouse position. Only while hovered: a transform at rest would make
+   * every card a stacking context (rule 6 in the design doc). */
+  transform: perspective(700px) rotateX(var(--gallery-tilt-x, 0deg)) rotateY(var(--gallery-tilt-y, 0deg));
   box-shadow: 0 20px 36px -12px rgb(0 0 0 / 0.45);
 }
 
@@ -392,6 +396,10 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
   a[href*='city=']:hover .overflow-hidden > img.object-cover,
   a[href*='/people/']:hover img.rounded-full {
     scale: none;
+  }
+
+  :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
+    transform: none;
   }
 
   [role='checkbox'][data-just-pressed] [data-icon-select],
