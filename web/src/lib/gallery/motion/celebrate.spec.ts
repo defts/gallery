@@ -26,8 +26,8 @@ describe('celebrate', () => {
     const layer = document.querySelector('[data-gallery-celebration]');
     expect(layer).not.toBeNull();
     expect(layer!.getAttribute('aria-hidden')).toBe('true');
-    // the ring plus 7 hearts
-    expect(layer!.children).toHaveLength(8);
+    // the ring plus 12 hearts
+    expect(layer!.children).toHaveLength(13);
 
     await vi.waitFor(() => expect(document.querySelector('[data-gallery-celebration]')).toBeNull());
   });

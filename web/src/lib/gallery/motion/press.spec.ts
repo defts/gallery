@@ -1,18 +1,28 @@
-import { installPressFeedback, lastPressPoint, pressScale } from '$lib/gallery/motion/press';
+import { hoverScale, installPressFeedback, lastPressPoint, pressScale } from '$lib/gallery/motion/press';
 
 describe('pressScale', () => {
-  it('dips small controls the most, capped at 0.92', () => {
-    expect(pressScale(24)).toBe(0.92);
-    expect(pressScale(40)).toBe(0.92);
+  it('dips small controls the most, capped at 0.86', () => {
+    expect(pressScale(24)).toBe(0.86);
+    expect(pressScale(100)).toBeCloseTo(0.86);
   });
 
-  it('squishes about 5px across mid-sized buttons', () => {
-    expect(pressScale(100)).toBeCloseTo(0.95);
+  it('squishes about 14px across wider buttons', () => {
+    expect(pressScale(200)).toBeCloseTo(0.93);
   });
 
-  it('barely moves wide rows', () => {
-    expect(pressScale(500)).toBe(0.99);
-    expect(pressScale(2000)).toBe(0.99);
+  it('still moves wide rows', () => {
+    expect(pressScale(500)).toBe(0.95);
+    expect(pressScale(2000)).toBe(0.95);
+  });
+});
+
+describe('hoverScale', () => {
+  it('pops icons the most, capped at 1.1', () => {
+    expect(hoverScale(40)).toBe(1.1);
+  });
+
+  it('grows wide buttons less', () => {
+    expect(hoverScale(300)).toBe(1.02);
   });
 });
 
@@ -37,17 +47,39 @@ describe('installPressFeedback', () => {
     vi.restoreAllMocks();
   });
 
-  it('squishes a pressed button and springs it back on release', () => {
+  it('squishes a pressed button and springs it back on release', async () => {
     document.body.innerHTML = '<button><span id="label">Save</span></button>';
     press(document.querySelector('#label')!);
 
     expect(animate).toHaveBeenCalledTimes(1);
-    expect(animate.mock.calls[0][0]).toEqual([{ scale: 1 }, { scale: 0.95 }]);
+    expect(animate.mock.calls[0][0]).toEqual([{ scale: 1 }, { scale: 0.86 }]);
     expect(document.querySelector('button')!.dataset.justPressed).toBe('');
 
+    // a quick tap still lets the dip land before springing back
     document.dispatchEvent(new PointerEvent('pointerup'));
-    expect(animate).toHaveBeenCalledTimes(2);
+    expect(animate).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(animate).toHaveBeenCalledTimes(2));
     expect(animate.mock.calls[1][0][1]).toEqual({ scale: 1 });
+  });
+
+  it('grows a hovered button under the mouse, and not menu rows', () => {
+    document.body.innerHTML = '<button id="b">b</button><div role="menuitem" id="m">m</div>';
+    const hover = (id: string, pointerType = 'mouse') =>
+      document.querySelector(`#${id}`)!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType }));
+
+    hover('m');
+    hover('b', 'touch');
+    expect(animate).not.toHaveBeenCalled();
+
+    hover('b');
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate.mock.calls[0][0]).toEqual([{ scale: 1 }, { scale: 1.05 }]);
+
+    document
+      .querySelector('#b')!
+      .dispatchEvent(new PointerEvent('pointerout', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).toHaveBeenCalledTimes(2);
+    expect(animate.mock.calls[1][0].at(-1)).toEqual({ scale: 1 });
   });
 
   it('leaves disabled and opted-out controls alone', () => {

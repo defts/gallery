@@ -112,13 +112,15 @@
 
 @keyframes gallery-scale-in {
   from {
-    scale: 0.94;
+    scale: 0.82;
+    translate: 0 32px;
   }
 }
 
 @keyframes gallery-scale-in-small {
   from {
-    scale: 0.96;
+    scale: 0.85;
+    translate: 0 -8px;
   }
 }
 
@@ -138,7 +140,7 @@
 [data-dialog-content][data-state='open'] {
   animation:
     gallery-fade-in var(--motion-quick) var(--ease-standard),
-    gallery-scale-in var(--spring-gentle-duration) var(--spring-gentle);
+    gallery-scale-in var(--spring-bouncy-duration) var(--spring-bouncy);
 }
 
 /* Menus, popovers and selects grow out of the control that opened them. */
@@ -148,7 +150,7 @@
   transform-origin: var(--bits-floating-transform-origin, top);
   animation:
     gallery-fade-in var(--motion-quick) var(--ease-standard),
-    gallery-scale-in-small var(--motion-base) var(--ease-settle);
+    gallery-scale-in-small var(--spring-gentle-duration) var(--spring-gentle);
 }
 
 [data-tooltip-content] {
@@ -165,8 +167,18 @@
 
 /* Timeline thumbnail selection: the photo shrinks into its frame with a little give. */
 [data-thumbnail-focus-container] .transition-transform {
-  transition-duration: var(--spring-gentle-duration);
-  transition-timing-function: var(--spring-gentle);
+  transition-duration: var(--spring-bouncy-duration);
+  transition-timing-function: var(--spring-bouncy);
+}
+
+/* Hovering a timeline photo draws it a little closer inside its frame (the frame clips it). Selected
+ * photos already sit shrunk in their frame, so they stay still. */
+[data-thumbnail-focus-container] img {
+  transition: scale 600ms var(--ease-settle);
+}
+
+[data-thumbnail-focus-container]:not([data-selected]):hover img {
+  scale: 1.1;
 }
 
 /* The check pops when a press selects something. `data-just-pressed` is set by press.ts for a
@@ -191,19 +203,26 @@
 [data-motion-lift],
 [data-testid='album-card'] img.aspect-square {
   transition:
-    translate var(--motion-base) var(--ease-settle),
+    translate var(--spring-gentle-duration) var(--spring-gentle),
+    scale var(--spring-gentle-duration) var(--spring-gentle),
     box-shadow var(--motion-base) var(--ease-settle);
 }
 
+:is([data-motion-lift-group], [data-testid='album-card']):hover {
+  /* The lift is a stacking context: raise the whole card so its own menus stay above the next card. */
+  z-index: 1;
+}
+
 :is([data-motion-lift-group], [data-testid='album-card']):hover :is([data-motion-lift], img.aspect-square) {
-  translate: 0 -3px;
-  box-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.35);
+  translate: 0 -8px;
+  scale: 1.04;
+  box-shadow: 0 20px 36px -12px rgb(0 0 0 / 0.45);
 }
 
 /* Round pictures (people) would show a square shadow: they lift and grow a hair instead. */
 [data-motion-lift-group]:hover [data-motion-lift='flat'][data-motion-lift] {
   box-shadow: none;
-  scale: 1.03;
+  scale: 1.07;
 }
 
 [data-motion-lift='flat'] {
@@ -221,11 +240,14 @@
 }
 
 #sidebar a[class~='rounded-e-full'] svg {
-  transition: scale var(--spring-snappy-duration) var(--spring-snappy);
+  transition:
+    scale var(--spring-bouncy-duration) var(--spring-bouncy),
+    rotate var(--spring-bouncy-duration) var(--spring-bouncy);
 }
 
 #sidebar a[class~='rounded-e-full']:hover svg {
-  scale: 1.1;
+  scale: 1.25;
+  rotate: -8deg;
 }
 
 /* Explore: place photos drift closer inside their frames and brighten; people grow a hair. Matched
@@ -239,7 +261,7 @@ a[href*='city='] .brightness-75 {
 }
 
 a[href*='city=']:hover .overflow-hidden > img.object-cover {
-  scale: 1.06;
+  scale: 1.12;
 }
 
 a[href*='city=']:hover .brightness-75 {
@@ -247,11 +269,11 @@ a[href*='city=']:hover .brightness-75 {
 }
 
 a[href*='/people/']:not(:has([data-motion-lift])) img.rounded-full {
-  transition: scale var(--spring-gentle-duration) var(--spring-gentle);
+  transition: scale var(--spring-bouncy-duration) var(--spring-bouncy);
 }
 
 a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
-  scale: 1.04;
+  scale: 1.08;
 }
 
 /* Sidebar groups (Spaces, Albums): children slide down into place and the chevron turns, instead of
@@ -273,7 +295,7 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
 
 @keyframes gallery-drop-in {
   from {
-    translate: 0 -6px;
+    translate: 0 -16px;
   }
 }
 
@@ -293,27 +315,37 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
 #control-bar {
   animation:
     gallery-fade-in var(--motion-quick) var(--ease-standard),
-    gallery-drop-in var(--spring-gentle-duration) var(--spring-gentle);
+    gallery-drop-in var(--spring-bouncy-duration) var(--spring-bouncy);
 }
 
 /* ── Layout transitions: pages crossfade (page-transition.ts) ────────── */
 
-#sidebar {
+/* Only while a crossfade runs (page-transition.ts adds the class): a view-transition-name makes its
+ * element a stacking context, which would trap the top bar's dropdowns under the page content. */
+:root.gallery-page-transition #sidebar {
   view-transition-name: gallery-sidebar;
 }
 
-#dashboard-navbar {
+:root.gallery-page-transition #dashboard-navbar {
   view-transition-name: gallery-navbar;
 }
 
 ::view-transition-old(root) {
-  animation: var(--motion-quick) var(--ease-exit) both gallery-fade-out;
+  animation:
+    var(--motion-quick) var(--ease-exit) both gallery-fade-out,
+    var(--motion-base) var(--ease-exit) both gallery-sink-out;
 }
 
 ::view-transition-new(root) {
   animation:
-    var(--motion-base) var(--ease-standard) both gallery-fade-in,
+    var(--motion-slow) var(--ease-standard) both gallery-fade-in,
     var(--spring-gentle-duration) var(--spring-gentle) both gallery-rise-in;
+}
+
+@keyframes gallery-sink-out {
+  to {
+    scale: 0.98;
+  }
 }
 
 @keyframes gallery-fade-out {
@@ -324,7 +356,7 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
 
 @keyframes gallery-rise-in {
   from {
-    translate: 0 8px;
+    translate: 0 28px;
   }
 }
 
@@ -356,6 +388,7 @@ a[href*='/people/']:not(:has([data-motion-lift])):hover img.rounded-full {
     animation: none;
   }
 
+  [data-thumbnail-focus-container]:not([data-selected]):hover img,
   a[href*='city=']:hover .overflow-hidden > img.object-cover,
   a[href*='/people/']:hover img.rounded-full {
     scale: none;

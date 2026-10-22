@@ -26,20 +26,24 @@ const SUCCESS_COLORS = ['#fa2921', '#ed79b5', '#ffb400', '#1e83f7', '#18c249'];
 
 const PIECES: Record<CelebrationKind, { count: number; piece: (index: number) => Piece; spread: number }> = {
   favorite: {
-    count: 7,
+    count: 12,
     spread: Math.PI * 2,
-    piece: (index) => ({ path: mdiHeart, color: HEART_COLORS[index % HEART_COLORS.length], size: 9 + (index % 3) * 2 }),
+    piece: (index) => ({
+      path: mdiHeart,
+      color: HEART_COLORS[index % HEART_COLORS.length],
+      size: 12 + (index % 3) * 3,
+    }),
   },
   success: {
-    count: 12,
-    spread: Math.PI * 1.2,
-    piece: (index) => ({ color: SUCCESS_COLORS[index % SUCCESS_COLORS.length], size: 5 + (index % 3) }),
+    count: 22,
+    spread: Math.PI * 1.3,
+    piece: (index) => ({ color: SUCCESS_COLORS[index % SUCCESS_COLORS.length], size: 6 + (index % 3) * 2 }),
   },
 };
 
 /** px/s² pulling pieces back down; low enough that a 650ms flight reads as a float, not a drop. */
 const GRAVITY = 700;
-const FLIGHT_MS = 650;
+const FLIGHT_MS = 850;
 const STEPS = 10;
 
 /** Where a piece is `t` seconds after launch. Exported for the spec. */
@@ -83,7 +87,7 @@ const createPiece = ({ path, color, size }: Piece, origin: Origin) => {
 
 /** A soft ring that expands from the origin: the "landing" the pieces fly out of. */
 const ring = (layer: HTMLElement, origin: Origin, color: string) => {
-  const size = 44;
+  const size = 72;
   const element = document.createElement('div');
   Object.assign(element.style, {
     position: 'absolute',
@@ -144,7 +148,7 @@ export const celebrate = (kind: CelebrationKind, origin?: Origin): void => {
   for (let index = 0; index < config.count; index++) {
     const jitter = (Math.random() - 0.5) * (config.spread / config.count) * 0.6;
     const angle = start + (config.spread * (index + 0.5)) / config.count + jitter;
-    const speed = 160 + Math.random() * 120;
+    const speed = 220 + Math.random() * 160;
     flights.push(fly(layer, config.piece(index), from, angle, speed));
   }
   void Promise.allSettled(flights).then(() => layer.remove());

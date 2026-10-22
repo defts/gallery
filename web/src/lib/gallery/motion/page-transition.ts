@@ -28,6 +28,8 @@ export const shouldCrossfade = (navigation: {
   return !navigation.from?.params?.assetId && !navigation.to?.params?.assetId;
 };
 
+const TRANSITION_CLASS = 'gallery-page-transition';
+
 /** `onNavigate` callback: SvelteKit waits for the returned promise before swapping the page. */
 export const crossfadeNavigation = (navigation: OnNavigate): Promise<void> | void => {
   // Older browsers without View Transitions just swap pages.
@@ -38,11 +40,16 @@ export const crossfadeNavigation = (navigation: OnNavigate): Promise<void> | voi
   if (!shouldCrossfade(navigation)) {
     return;
   }
+  // The sidebar and top bar are named only for the transition's lifetime (see motion.css).
+  const root = document.documentElement;
+  root.classList.add(TRANSITION_CLASS);
   return new Promise((resolve) => {
     // eslint-disable-next-line tscompat/tscompat
-    document.startViewTransition(async () => {
+    const transition = document.startViewTransition(async () => {
       resolve();
       await navigation.complete;
     });
+    // eslint-disable-next-line tscompat/tscompat
+    void transition.finished.finally(() => root.classList.remove(TRANSITION_CLASS));
   });
 };
