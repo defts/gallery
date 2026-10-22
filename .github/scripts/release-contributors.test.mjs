@@ -75,22 +75,15 @@ test("groupByAuthor drops bots and orders by fewest changes, then login", () => 
   ]);
 });
 
-test("renderContributors links profiles rather than @-mentioning, and summarises long lists", () => {
+test("renderContributors @-mentions each contributor, and summarises long lists", () => {
   const long = Array.from({ length: 9 }, (_, i) => i + 1);
   const markdown = renderContributors([
     { login: "alice", prs: [1165, 1166] },
     { login: "maintainer", prs: long },
   ]);
   assert.match(markdown, /^## Contributors\n/);
-  assert.match(
-    markdown,
-    /- \[@alice\]\(https:\/\/github\.com\/alice\): #1165, #1166/,
-  );
-  assert.match(
-    markdown,
-    /- \[@maintainer\]\(https:\/\/github\.com\/maintainer\): 9 changes/,
-  );
-  assert.doesNotMatch(markdown, /(^|\s)@alice/m);
+  assert.match(markdown, /^- @alice: #1165, #1166$/m);
+  assert.match(markdown, /^- @maintainer: 9 changes$/m);
 });
 
 test("renderContributors is empty when there is nobody to credit", () => {
@@ -154,9 +147,9 @@ test("buildContributorsSection produces the section end to end", async () => {
   });
   assert.equal(failed, 0); // #1039 is an issue number: it 404s and is skipped, not counted as a failure
   assert.equal(looked, 6);
-  assert.match(markdown, /\[@claude-on-call\].*#1124/);
-  assert.match(markdown, /\[@luminoso\].*#1180/);
-  assert.match(markdown, /\[@maintainer\].*#1230, #1231/);
+  assert.match(markdown, /^- @claude-on-call: #1124$/m);
+  assert.match(markdown, /^- @luminoso: #1180$/m);
+  assert.match(markdown, /^- @maintainer: #1230, #1231$/m);
   assert.doesNotMatch(markdown, /dependabot/);
   // fewest changes first, so the maintainer closes the list
   assert.ok(markdown.indexOf("maintainer") > markdown.indexOf("luminoso"));

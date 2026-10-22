@@ -99,7 +99,7 @@ export function groupByAuthor(authors) {
     );
 }
 
-// Profile links rather than bare @mentions: they read the same, but nobody is pinged by a release body.
+// Real @mentions, so contributors are tagged (and linked) in the release.
 export function renderContributors(groups, { maxListed = MAX_LISTED } = {}) {
   if (groups.length === 0) {
     return "";
@@ -109,7 +109,7 @@ export function renderContributors(groups, { maxListed = MAX_LISTED } = {}) {
       prs.length > maxListed
         ? `${prs.length} changes`
         : prs.map((n) => `#${n}`).join(", ");
-    return `- [@${login}](https://github.com/${login}): ${detail}`;
+    return `- @${login}: ${detail}`;
   });
   return [
     "## Contributors",
