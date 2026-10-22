@@ -90,6 +90,14 @@ describe('installPressFeedback', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
+  it('leaves map markers alone, on press and on hover', () => {
+    document.body.innerHTML = '<div class="maplibregl-map"><div role="button" id="marker">12</div></div>';
+    const marker = document.querySelector('#marker')!;
+    press(marker);
+    marker.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+
   it('leaves surfaces larger than a control alone', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1200, height: 800 } as DOMRect);
     document.body.innerHTML = '<button>backdrop</button>';

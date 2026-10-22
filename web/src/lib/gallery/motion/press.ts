@@ -6,12 +6,19 @@ import { duration, ease, prefersReducedMotion, spring, springEasing } from '$lib
  * components get it without being edited.
  *
  * Opt a custom element in with `data-press`, or out with `data-no-press` (on it or any ancestor).
+ * Everything inside a map is out.
  */
 export const PRESSABLE =
   'button, [role="button"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"], [role="option"], [data-press]';
 
 /** How long `data-just-pressed` stays after release, so CSS can pop what the press changed. */
 export const JUST_PRESSED_MS = 700;
+
+/**
+ * Never animated. Maps position their markers with their own transforms, and a marker that grows under
+ * the cursor moves its hit area, so hover flickers on and off and the marker is hard to click.
+ */
+const NO_MOTION = '[data-no-press], .maplibregl-map';
 
 /** Hover grows buttons only; rows in menus and lists, tabs and checkboxes highlight instead. */
 const HOVERABLE = 'button, [role="button"], [data-press]';
@@ -51,7 +58,7 @@ const findPressable = (target: EventTarget | null, selector = PRESSABLE): HTMLEl
   if (
     !element ||
     typeof element.animate !== 'function' ||
-    element.closest('[data-no-press]') ||
+    element.closest(NO_MOTION) ||
     element.matches(':disabled, [aria-disabled="true"]') ||
     prefersReducedMotion()
   ) {

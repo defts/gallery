@@ -92,7 +92,10 @@ console.log(Math.round(T * 1000), `linear(${Array.from({ length: n + 1 }, (_, i)
 6. **No permanent stacking contexts on chrome.** A `view-transition-name`, `translate` or `scale` on an
    element traps its dropdowns under later content. Name the sidebar and top bar only while a crossfade
    runs (`gallery-page-transition` class), and raise a hovered card (`z-index: 1`) while it is lifted.
-7. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
+7. **Hands off library-positioned elements.** Map markers are placed by MapLibre's own transforms, and a
+   marker that grows under the cursor moves its hit area, so hover flickers and clicks miss. Nothing
+   inside `.maplibregl-map` gets press or hover motion; markers keep upstream's own hover zoom.
+8. **Upstream layering.** All logic lives in `web/src/lib/gallery/motion/`; `motion.css` is imported by
    the fork-owned `gallery-theme.css`. Upstream components are reached by stable hooks they already
    expose (bits-ui `data-*-content`/`data-state`, `data-thumbnail-focus-container`, `data-testid`,
    `#sidebar`) rather than by editing them. Fork components opt in with attributes
