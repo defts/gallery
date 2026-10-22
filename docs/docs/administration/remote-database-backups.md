@@ -60,7 +60,7 @@ So a wrong bucket name or an expired key leaves you with exactly the local-only 
 
 - **Retention** (`Keep last amount`) applies to every backup you can see, counting the bucket and the server's disk together, so the total is bounded however the uploads are faring. A file left behind by a failed upload is retried first; if it is still outside the newest `Keep last amount` after that, it is pruned like any other.
 - **The backup list** merges both places, so during an outage you still see one coherent set.
-- **Downloading** a backup serves it from wherever it is, always streamed through the server. Unlike your media, backups ignore `IMMICH_S3_SERVE_MODE`: a presigned redirect would let anyone holding that URL fetch the whole dump with no Immich session, and a dump contains every user's password hash and session tokens.
+- **Downloading** a backup serves it from wherever it is, always streamed through the server. Unlike your media, backups ignore `IMMICH_S3_SERVE_MODE`: a presigned redirect would let anyone holding that URL fetch the whole dump without signing in, and a dump contains every user's password hash and session tokens.
 - **Restoring** reads straight from the bucket, so a backup that has already been uploaded can be restored without downloading it first. The automatic restore point Gallery takes before a restore is always kept on local disk, since it exists to recover a restore that goes wrong.
 - **Uploading** a backup through the admin UI follows the same staged path and ends up in the bucket.
 
