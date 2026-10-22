@@ -224,10 +224,10 @@ New fork code is in `server/src/gallery/utils/backup-store.ts` and
   to boot.
 - `web/src/routes/admin/system-settings/BackupSettings.svelte` — one `{#if}` group inside the existing section.
 
-Measured against the `v3.3.3` tag, the upstream files this touches go from +337/-9 to +691/-77 lines. Two of them
-were byte-identical to upstream before: `database-backup.service.ts` (now +254/-67) and `BackupSettings.svelte`
-(now +35/-1). The service is where the whole change lives, so that is the cost being paid; the rest are one or two
-lines each.
+Measured against the `v3.3.5` tag (the base after the 2026-10-22 rebase), the upstream files this touches go from
++674/-9 to +1138/-76 lines. Two of them were byte-identical to upstream before: `database-backup.service.ts`
+(now +341/-66) and `BackupSettings.svelte` (now +18/-1). The service is where the whole change lives, so that is
+the cost being paid; the rest are a handful of lines each.
 
 No database migration, no new dependency (`@aws-sdk/client-s3`, `@aws-sdk/lib-storage` and
 `@aws-sdk/s3-request-presigner` are already server dependencies), and no fork table, so
