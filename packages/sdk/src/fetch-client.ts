@@ -3782,6 +3782,8 @@ export type ServerFeaturesDto = {
     reverseGeocoding: boolean;
     /** Whether search is enabled */
     search: boolean;
+    /** Whether a favourites browse (isFavorite=true) may combine withSharedSpaces/withPartners with an unset visibility: own favourites incl. archived, plus partners and member spaces in timeline visibility. Absent on older servers. */
+    searchFavoritesAcrossSpaces?: boolean;
     /** Whether POST /search/options exists. Absent on older servers. */
     searchOptions?: boolean;
     /** Whether sidecar files are supported */
