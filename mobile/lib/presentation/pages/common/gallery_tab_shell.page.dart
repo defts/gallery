@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/motion/motion_host.dart';
 import 'package:immich_mobile/gallery/motion/transitions.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart';
@@ -81,6 +82,13 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
       // if auto_route ever learned to keep the index itself.
       _syncTab();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // App-wide motion (favourite bursts, photos thrown to the trash) draws in the root overlay.
+    GalleryMotionHost.attach(Overlay.of(context, rootOverlay: true));
   }
 
   @override

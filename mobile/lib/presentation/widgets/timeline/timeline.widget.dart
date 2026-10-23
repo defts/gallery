@@ -748,10 +748,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                     // Not primary: attaching to [_scrollController] while segments reload (e.g. on
                     // rotation) would fire [_restoreAssetPosition] early and drop the saved position.
                     primary: false,
-                    slivers: [
-                      if (widget.appBar != null) widget.appBar!,
-                      const GalleryTimelineSkeleton(),
-                    ],
+                    slivers: [if (widget.appBar != null) widget.appBar!, const GalleryTimelineSkeleton()],
                   ),
               onData: (segments) {
                 _lastRenderedSegments = segments;
