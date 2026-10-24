@@ -30,7 +30,11 @@ If you run Gallery from a [config file](/install/config-file), set it there inst
 
 In config-file mode the server cannot refuse the setting at save time, because there is no save. If the file turns this on while `IMMICH_STORAGE_BACKEND` is not `s3`, the server logs a warning on the first backup and keeps writing backups to local disk.
 
-That is the whole setting. Backups go to the same bucket as your media, under `backups/` — the same folder name they use on disk, and one no media file can occupy, since media is written under `upload/`, `library/`, `thumbs/`, `encoded-video/` and `profile/`. If you want S3 lifecycle rules just for your backups, scope them to the `backups/` prefix.
+That is the whole setting. Backups go to the same bucket as your media, under `backups/` — the same folder name they use on disk, and one no media file can occupy, since media is written under `upload/`, `library/`, `thumbs/`, `encoded-video/` and `profile/`. If you want S3 lifecycle rules just for your backups, scope them to the `backups/` prefix. Rules on the whole bucket apply to backups too: a rule that moves objects to an archive storage class such as Glacier makes those backups impossible to restore until they are retrieved.
+
+:::warning One server per bucket
+Every server writes to the same `backups/` prefix. If two servers share a bucket (for example a test copy of your instance pointed at the production bucket), each one lists the other's backups and its retention pass deletes them. Give each server its own bucket, or turn this option off on the copy. A copy restored from a database backup inherits this setting, so check it after a restore.
+:::
 
 The next scheduled or manual backup is uploaded. From then on, **Administration > Settings > Backup Settings** and the restore picker list the backups in your bucket.
 
@@ -66,8 +70,8 @@ So a wrong bucket name or an expired key leaves you with exactly the local-only 
 
 ## Turning it off
 
-Turn the toggle off and save. The next backup stays on local disk, and retention goes back to pruning the local folder. Objects already in the bucket are left alone — delete them yourself if you no longer want them.
+Turn the toggle off and save. The next backup stays on local disk, and retention goes back to pruning the local folder. Objects already in the bucket are left alone, and they no longer appear in the backup list or the restore picker. Delete them yourself if you no longer want them.
 
 :::caution
-Database backups contain metadata only, never photos or videos. They must be paired with a copy of the files in `UPLOAD_LOCATION`, as described in [Backup and Restore](/administration/backup-and-restore). The dumps live in the same bucket as your media, so this is not an off-site copy of anything — losing the bucket loses both.
+Database backups contain metadata only, never photos or videos. They must be paired with a copy of the files in `UPLOAD_LOCATION`, as described in [Backup and Restore](/administration/backup-and-restore). The dumps live in the same bucket as your media, so this is not an off-site copy of anything — losing the bucket loses both. A dump contains every user's password hash and session tokens, so make sure the bucket is private and encrypted at rest.
 :::

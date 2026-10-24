@@ -79,6 +79,10 @@ const listingUnder =
 const configWithS3 = (enabled: boolean) =>
   ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
+const keepLastConfig = (keepLastAmount: number) => ({
+  backup: { database: { ...systemConfigStub.backupEnabled.backup.database, keepLastAmount } },
+});
+
 describe(DatabaseBackupService.name, () => {
   let sut: DatabaseBackupService;
   let mocks: ServiceMocks;
@@ -297,6 +301,79 @@ describe(DatabaseBackupService.name, () => {
 
         expect(remote.put).not.toHaveBeenCalled();
         expect(staging.delete).not.toHaveBeenCalled();
+      });
+    });
+
+    // Backups split across both places: stragglers from failed uploads, backups made before the switch
+    // was turned on, and objects left in the bucket after it was turned off.
+    describe('with backups on both local disk and S3', () => {
+      it('should keep the newest backups whichever side they are on', async () => {
+        enableRemote();
+        mocks.systemMetadata.get.mockResolvedValue(keepLastConfig(2));
+        remote.seed('backups/immich-db-backup-1.sql.gz', 'backups/immich-db-backup-3.sql.gz');
+        staging.seed('backups/immich-db-backup-2.sql.gz', 'backups/immich-db-backup-4.sql.gz');
+        remote.put.mockRejectedValue(new Error('AccessDenied'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/media/);
+
+        expect(staging.held.keys().toArray()).toEqual(['backups/immich-db-backup-4.sql.gz']);
+        expect(remote.held.keys().toArray()).toEqual(['backups/immich-db-backup-3.sql.gz']);
+      });
+
+      it('should upload the local backups made before the switch was turned on', async () => {
+        enableRemote();
+        mocks.systemMetadata.get.mockResolvedValue(keepLastConfig(14));
+        staging.seed(
+          'backups/immich-db-backup-1.sql.gz',
+          'backups/immich-db-backup-2.sql.gz',
+          'backups/uploaded-mine.sql.gz',
+          'backups/restore-point-immich-db-backup-0.sql.gz',
+        );
+
+        await expect(sut.cleanupDatabaseBackups()).resolves.toBeUndefined();
+
+        expect(remote.held.keys().toArray().toSorted()).toEqual([
+          'backups/immich-db-backup-1.sql.gz',
+          'backups/immich-db-backup-2.sql.gz',
+          'backups/uploaded-mine.sql.gz',
+        ]);
+        expect(staging.held.keys().toArray()).toEqual(['backups/restore-point-immich-db-backup-0.sql.gz']);
+      });
+
+      it('should manage local backups as before, never touching S3, once the switch is turned off', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(keepLastConfig(1));
+        remote.seed('backups/immich-db-backup-5.sql.gz');
+        staging.seed('backups/immich-db-backup-1.sql.gz', 'backups/immich-db-backup-2.sql.gz');
+
+        await expect(sut.cleanupDatabaseBackups()).resolves.toBeUndefined();
+        const { backups } = await sut.listBackups();
+
+        expect(staging.held.keys().toArray()).toEqual(['backups/immich-db-backup-2.sql.gz']);
+        expect(backups.map(({ filename }) => filename)).toEqual(['immich-db-backup-2.sql.gz']);
+        expect(remote.list).not.toHaveBeenCalled();
+        expect(remote.delete).not.toHaveBeenCalled();
+        expect(remote.held.size).toBe(1);
+      });
+
+      it('should list, download and delete a backup wherever it is', async () => {
+        enableRemote();
+        staging.seed('backups/immich-db-backup-2.sql.gz');
+        remote.seed('backups/immich-db-backup-1.sql.gz');
+
+        const { backups } = await sut.listBackups();
+        expect(backups.map(({ filename }) => filename)).toEqual([
+          'immich-db-backup-2.sql.gz',
+          'immich-db-backup-1.sql.gz',
+        ]);
+
+        await sut.downloadBackup('immich-db-backup-1.sql.gz');
+        await sut.downloadBackup('immich-db-backup-2.sql.gz');
+        expect(remote.getServeStrategy).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz', expect.anything());
+        expect(staging.getServeStrategy).toHaveBeenCalledWith('backups/immich-db-backup-2.sql.gz', expect.anything());
+
+        await sut.deleteBackup(['immich-db-backup-1.sql.gz', 'immich-db-backup-2.sql.gz']);
+        expect(staging.held.size).toBe(0);
+        expect(remote.held.size).toBe(0);
       });
     });
   });
@@ -571,6 +648,21 @@ describe(DatabaseBackupService.name, () => {
         await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(
           expect.objectContaining({ cause: expect.objectContaining({ cause }) }) as never,
         );
+      });
+
+      // Regression (review): this delete was the one step in cleanup outside a try/catch, so a disk error
+      // on it skipped the prune and the .tmp sweep, the failure the ordering of this method exists to stop.
+      it('should still prune and sweep when deleting a local duplicate fails', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled); // keepLastAmount: 1
+        staging.seed('backups/immich-db-backup-2.sql.gz', 'backups/immich-db-backup-3.sql.gz.tmp');
+        remote.seed('backups/immich-db-backup-1.sql.gz', 'backups/immich-db-backup-2.sql.gz');
+        staging.delete.mockRejectedValueOnce(new Error('EACCES'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/finished with 1 error/);
+
+        expect(remote.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
+        expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
+        expect(remote.put).not.toHaveBeenCalled();
       });
 
       it('should still succeed when the local delete fails after a good upload', async () => {
@@ -959,9 +1051,85 @@ describe(DatabaseBackupService.name, () => {
 
     it('should write file', async () => {
       await sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never);
-      expect(staging.put).toBeCalledWith('backups/uploaded-path.sql.gz', 'buffer', {
+      expect(staging.put).toBeCalledWith('backups/uploaded-path.sql.gz.tmp', 'buffer', {
         contentType: 'application/gzip',
       });
+      expect(staging.rename).toBeCalledWith('backups/uploaded-path.sql.gz.tmp', 'backups/uploaded-path.sql.gz');
+      expect(staging.held.keys().toArray()).toEqual(['backups/uploaded-path.sql.gz']);
+    });
+
+    // Regression (review): the upload used to be written straight to its real name, so a retention pass
+    // running at the same time (in the microservices worker) could list it half written, upload the
+    // truncated file to S3 as a valid backup and delete the local copy.
+    it('should not let a concurrent retention pass see an upload that is still being written', async () => {
+      enableRemote();
+      mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.backupEnabled);
+      let promotedDuringWrite: string[] = ['not checked'];
+      staging.put.mockImplementationOnce(async (key: string) => {
+        staging.held.set(key, 1);
+        await sut.cleanupDatabaseBackups();
+        promotedDuringWrite = remote.put.mock.calls.map(([key]) => key);
+      });
+
+      await sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never);
+
+      expect(promotedDuringWrite).toEqual([]);
+      expect(remote.held.has('backups/uploaded-path.sql.gz')).toBe(true);
+      expect(staging.held.size).toBe(0);
+    });
+
+    it('should remove the partial file and fail when the write fails', async () => {
+      enableRemote();
+      staging.put.mockImplementationOnce((key: string) => {
+        staging.held.set(key, 1);
+        return Promise.reject(new Error('ENOSPC'));
+      });
+
+      await expect(sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never)).rejects.toThrow(
+        'ENOSPC',
+      );
+
+      expect(staging.held.size).toBe(0);
+      expect(remote.put).not.toHaveBeenCalled();
+    });
+
+    it('should keep the upload on local disk and fail, naming the bucket, when the S3 upload fails', async () => {
+      enableRemote();
+      remote.put.mockRejectedValue(new Error('AccessDenied'));
+
+      await expect(sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never)).rejects.toThrow(
+        /media/,
+      );
+
+      expect(staging.held.keys().toArray()).toEqual(['backups/uploaded-path.sql.gz']);
+      expect(remote.held.size).toBe(0);
+    });
+
+    // The admin upload and the retention pass can promote the same finished file at once. The one that
+    // loses finds the local copy gone, but the backup is in the bucket, so it must not report a failure.
+    it('should succeed when a concurrent retention pass promoted the upload first', async () => {
+      enableRemote();
+      staging.get.mockImplementationOnce((key: string) => {
+        staging.held.delete(key);
+        remote.held.set(key, 1);
+        return Promise.reject(new Error(`ENOENT: ${key}`));
+      });
+
+      await expect(
+        sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should still fail when the local copy vanished and the bucket does not have it', async () => {
+      enableRemote();
+      staging.get.mockImplementationOnce((key: string) => {
+        staging.held.delete(key);
+        return Promise.reject(new Error(`ENOENT: ${key}`));
+      });
+
+      await expect(sut.uploadBackup({ originalname: 'path.sql.gz', buffer: 'buffer' } as never)).rejects.toThrow(
+        /media/,
+      );
     });
 
     it('should promote an uploaded backup to S3 like any other', async () => {
@@ -1398,6 +1566,26 @@ describe(DatabaseBackupService.name, () => {
 
       expect(remote.get).toHaveBeenCalledWith('backups/development-filename.sql');
       expect(maintenanceHealthRepositoryMock.checkApiHealth).toHaveBeenCalled();
+    });
+
+    // `pipe` does not forward errors, so without the forwarding in the service a dropped S3 socket would be
+    // an unhandled 'error' that kills the worker instead of a failed restore.
+    it('should fail the restore, not crash, when the S3 read drops part way through a .gz backup', async () => {
+      enableRemote();
+      remote.seed('backups/development-filename.sql.gz');
+      mocks.user.hasAdmin.mockResolvedValue(true);
+      // fails on the first read, before the restore has started consuming the decoded side
+      const dropped: Readable = new Readable({
+        read: () => {
+          dropped.push('SELECT 1;\n');
+          dropped.destroy(new Error('socket hang up'));
+        },
+      });
+      remote.get.mockResolvedValueOnce({ stream: dropped });
+
+      await expect(sut.restoreDatabaseBackup('development-filename.sql.gz')).rejects.toThrow('socket hang up');
+
+      expect(mocks.database.runMigrations).not.toHaveBeenCalled();
     });
 
     it('should reject a backup that is in neither place', async () => {

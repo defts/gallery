@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, Optional } from '@n
 import { debounce } from 'lodash-es';
 import { DateTime } from 'luxon';
 import { basename } from 'node:path';
-import { Duplex, PassThrough, Readable, Writable } from 'node:stream';
+import { Duplex, PassThrough, Readable, Writable, pipeline as pipelineCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { coerce, satisfies } from 'semver';
 import type { ArgOf } from 'src/repositories/event.repository.js';
@@ -354,6 +354,12 @@ export class DatabaseBackupService {
       // The upload may have failed before it consumed the read, so the file descriptor behind it is
       // still open. Every cron tick retries, so leaking one per failure eventually exhausts the process.
       source?.destroy();
+      // An admin upload and the retention pass can promote the same file at once (they run in different
+      // workers). Whichever deletes the local copy first makes the other's read fail, but the backup is
+      // in the bucket, so that is not a failed upload.
+      if (await this.promotedElsewhere(store, key)) {
+        return;
+      }
       throw new Error(
         `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}). The backup is still on local disk and the next run will retry the upload.`,
         { cause: error },
@@ -365,6 +371,14 @@ export class DatabaseBackupService {
     await store.staging
       .delete(key)
       .catch((error) => this.logger.warn(`Uploaded ${filename} to S3 but failed to delete the local copy: ${error}`));
+  }
+
+  private async promotedElsewhere(store: BackupStore, key: string): Promise<boolean> {
+    try {
+      return !(await store.staging.exists(key)) && !!(await store.remote?.backend.exists(key));
+    } catch {
+      return false;
+    }
   }
 
   /** Filenames under a backend prefix, with the prefix stripped, so both key spaces compare alike. */
@@ -398,7 +412,21 @@ export class DatabaseBackupService {
 
     const filename = `uploaded-${fn}`;
     const store = await this.backupStore.resolve();
-    await store.staging.put(store.key(filename), file.buffer, { contentType: backupContentType(filename) });
+    const key = store.key(filename);
+    // Staged like the dump: the retention pass (another worker) promotes and then deletes any valid backup
+    // it lists, so a file written straight to its real name could be uploaded half written. The `.tmp` name
+    // is not a valid backup name, so nothing lists it until the rename. It is not swept by retention either
+    // (that would race an upload in progress), so it is removed here if the write fails.
+    const temporaryKey = `${key}.tmp`;
+    try {
+      await store.staging.put(temporaryKey, file.buffer, { contentType: backupContentType(filename) });
+      await store.staging.rename(temporaryKey, key);
+    } catch (error) {
+      await store.staging
+        .delete(temporaryKey)
+        .catch((error) => this.logger.error(`Failed to delete partial uploaded backup: ${error}`));
+      throw error;
+    }
     await this.promoteToRemote(store, filename);
   }
 
@@ -555,8 +583,14 @@ export class DatabaseBackupService {
           continue;
         }
         if (remoteNames.has(filename)) {
-          // already in the bucket, so the local copy is a duplicate
-          await store.staging.delete(store.key(filename));
+          // Already in the bucket, so the local copy is a duplicate. A failed delete is only collected:
+          // like every other step here it must not stop the prune and the sweep below.
+          try {
+            await store.staging.delete(store.key(filename));
+          } catch (error) {
+            failures.push(error);
+            this.logger.warn(`Could not delete local copy of ${filename}, which is already in S3: ${error}`);
+          }
           continue;
         }
         try {
@@ -659,19 +693,11 @@ export class DatabaseBackupService {
 
       this.logger.log(`Database Restore Starting. Database Version: ${databaseMajorVersion}`);
 
-      let inputStream: Readable;
       const { stream: backupStream } = await source.backend.get(source.key);
-      if (filename.endsWith('.gz')) {
-        const gunzip = this.storageRepository.createGunzip();
-        // `pipe` does not forward errors, and a read that fails mid-stream is a real possibility now that
-        // the source may be S3 (a dropped socket, an expired credential). Without this the error lands on
-        // `backupStream` with no listener and takes the worker down instead of rolling the restore back.
-        backupStream.on('error', (error) => gunzip.destroy(error));
-        backupStream.pipe(gunzip);
-        inputStream = gunzip;
-      } else {
-        inputStream = backupStream;
-      }
+      let inputStream = readBackup(
+        backupStream,
+        filename.endsWith('.gz') ? this.storageRepository.createGunzip() : new PassThrough(),
+      );
 
       const sqlStream = Readable.from(sql(inputStream, databaseUsername, isPgClusterDump));
       const psql = this.processRepository.spawnDuplexStream(bin, args, {
@@ -708,10 +734,7 @@ export class DatabaseBackupService {
 
         // the restore point is never promoted, so it is always on the staging disk
         const { stream: restorePointStream } = await store.staging.get(store.key(restorePointFilename));
-        const gunzip = this.storageRepository.createGunzip();
-        restorePointStream.on('error', (error) => gunzip.destroy(error));
-        restorePointStream.pipe(gunzip);
-        inputStream = gunzip;
+        inputStream = readBackup(restorePointStream, this.storageRepository.createGunzip());
 
         const sqlStream = Readable.from(sqlRollback(inputStream, databaseUsername));
         const psql = this.processRepository.spawnDuplexStream(bin, args, {
@@ -743,6 +766,21 @@ export class DatabaseBackupService {
 
     this.logger.log(`Database Restore Success`);
   }
+}
+
+/**
+ * Feeds a backup's raw stream through `decoder` (a gunzip, or a pass-through for plain SQL) and returns the
+ * decoded side. `pipe` does not forward errors, and a read that fails part way is a real possibility now
+ * that the source may be S3 (a dropped socket, an expired credential). `pipeline` puts an error listener on
+ * both streams straight away and moves a failure onto `decoder`, where the restore's own read rejects with
+ * it. Listening only once that read starts is too late: an error before then (an early drop, or a corrupt
+ * gzip header) is uncaught and takes the worker down instead of failing the restore.
+ */
+function readBackup(source: Readable, decoder: Duplex): Readable {
+  pipelineCallback(source, decoder, () => {
+    // the error, if any, is already on `decoder`, where the restore reads it
+  });
+  return decoder;
 }
 
 const SQL_DROP_CONNECTIONS = `

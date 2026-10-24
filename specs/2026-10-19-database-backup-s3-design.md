@@ -105,7 +105,7 @@ against either backend, and the fixed prefix is what lets a promote reuse the sa
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `createDatabaseBackup`   | Pipes `pg_dump \| gzip` into `staging.put(<key>.tmp)` and renames it to its real name. Does **not** upload — see section 3.                                     |
 | `promoteToRemote`        | The staged promote: `staging.get` streamed into `remote.backend.put`, then `staging.delete`. Called by the retention pass and by `uploadBackup`.                |
-| `uploadBackup`           | Admin-supplied file, same staged path through the shared helper.                                                                                                |
+| `uploadBackup`           | Admin-supplied file, written to `<key>.tmp` and renamed like the dump, then promoted through the shared helper.                                                 |
 | `listBackups`            | Unions both listings, deduplicated by filename, local winning. A failure on one side is warned and skipped, so an unreachable bucket cannot hide local backups. |
 | `cleanupDatabaseBackups` | Promotes, prunes the union to `keepLastAmount`, sweeps local `.tmp` files, then reports any upload failure (section 4).                                         |
 | `downloadBackup`         | Resolves the backup, asks that backend for a serve strategy, and converts it to the matching `ImmichMediaResponse`.                                             |
@@ -124,7 +124,20 @@ user's password hash and session tokens. Proxying keeps the download on the auth
 
 **The restore read forwards stream errors.** `pipe()` does not, and the source may now be S3, so a dropped socket
 mid-restore would otherwise be an unhandled `'error'` that takes the worker down instead of rolling the restore
-back.
+back. `readBackup` joins the source to the decoder with `stream.pipeline`, which listens on both at once. Forwarding
+by hand (`source.on('error', e => gunzip.destroy(e))`) is not enough: the decoder then has no listener until the
+restore starts reading it, so an early drop or a corrupt gzip header is still uncaught.
+
+**An admin upload is staged too.** The retention pass runs in the microservices worker and promotes, then deletes,
+every valid backup it lists. An upload written straight to its real name could be listed half written, uploaded
+truncated and then lost locally. It is written to `<key>.tmp` (not a valid name, so never listed) and renamed. An
+interrupted upload's `.tmp` is removed by `uploadBackup` itself, not swept by retention, because sweeping it would
+race an upload still in progress. The two can still promote the same finished file at once; the loser's read
+fails, so `promoteToRemote` treats "gone locally and present in the bucket" as done rather than as a failed upload.
+
+**One server per bucket.** The prefix is fixed, so two servers on one bucket share one backup namespace and each
+one's retention prunes the other's dumps. A copy of an instance restored from a database backup inherits
+`backup.database.s3.enabled`, so a test clone pointed at the production bucket must turn it off. The user docs say so.
 
 **The `.tmp` promote still matters.** `isValidDatabaseBackupName` excludes `.tmp` and `isFailedDatabaseBackupName`
 matches it, so a dump killed half way can never be listed or restored as a valid backup. With a remote configured
