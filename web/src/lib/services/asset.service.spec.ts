@@ -12,11 +12,11 @@ import { vitest } from 'vitest';
 import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
-import { queryClient } from '$lib/queries/client';
-import { getUserConfigQuery } from '$lib/queries/config-user.query';
 import AssetAddToCollectionModal from '$lib/modals/AssetAddToCollectionModal.svelte';
 import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
+import { queryClient } from '$lib/queries/client';
+import { getUserConfigQuery } from '$lib/queries/config-user.query';
 import {
   getAssetActions,
   getAssetBulkActions,
