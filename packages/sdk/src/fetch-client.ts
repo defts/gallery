@@ -3262,6 +3262,8 @@ export type SearchOptionsPersonDto = {
     filterId: string;
     /** Person ID, the same value as filterId */
     id: string;
+    /** Whether this is a pet rather than a person (the People / Pets toggle); absent from older servers */
+    isPet?: boolean;
     /** Whether this person is one of the active people filters */
     isSelected: boolean;
     /** Person name */
