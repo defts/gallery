@@ -360,8 +360,10 @@ export class DatabaseBackupService {
       if (await this.promotedElsewhere(store, key)) {
         return;
       }
+      // The S3 error goes in the message, not only in `cause`: neither the per-file log line nor the job
+      // runner's failure log prints a cause, so without it an AccessDenied and a DNS failure log alike.
       throw new Error(
-        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}). The backup is still on local disk and the next run will retry the upload.`,
+        `Failed to upload database backup ${filename} to S3 bucket "${remote.bucket}" (key ${key}): ${describeError(error)}. The backup is still on local disk and the next run will retry the upload.`,
         { cause: error },
       );
     }
@@ -643,11 +645,13 @@ export class DatabaseBackupService {
     this.logger.debug(`Database Backup Cleanup Finished, deleted ${toDelete.length + failedBackups.length} backups`);
 
     // Reported only now that retention has run, so the job still fails and names the bucket. The first
-    // underlying error is kept as the cause: without it a persistent AccessDenied is indistinguishable
-    // from a DNS failure in the logs, and this is the one place an admin learns the upload is broken.
+    // underlying S3 error is named in the message (and kept as the cause): without it a persistent
+    // AccessDenied is indistinguishable from a DNS failure in the logs, and this is the one place an admin
+    // learns the upload is broken.
     if (promoteFailures.length > 0) {
+      const firstCause = (failures[0] as { cause?: unknown } | undefined)?.cause ?? failures[0];
       throw new Error(
-        `Failed to upload ${promoteFailures.length} database backup(s) to S3 bucket "${remote?.bucket}": ${promoteFailures.join(', ')}. They are still on local disk and the next run will retry.`,
+        `Failed to upload ${promoteFailures.length} database backup(s) to S3 bucket "${remote?.bucket}" (first error: ${describeError(firstCause)}): ${promoteFailures.join(', ')}. They are still on local disk and the next run will retry.`,
         { cause: failures[0] },
       );
     }
@@ -766,6 +770,14 @@ export class DatabaseBackupService {
 
     this.logger.log(`Database Restore Success`);
   }
+}
+
+/** `AccessDenied: Access Denied.` rather than a bare `Error`, so a log line says why an S3 call failed. */
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name && !error.message.startsWith(error.name) ? `${error.name}: ${error.message}` : error.message;
+  }
+  return String(error);
 }
 
 /**

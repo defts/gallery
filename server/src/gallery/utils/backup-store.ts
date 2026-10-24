@@ -81,7 +81,9 @@ export class BackupStoreResolver {
     private readonly storageRepository: StorageRepository,
     private readonly systemMetadataRepository: SystemMetadataRepository,
     private readonly logger: LoggingRepository,
-  ) {}
+  ) {
+    this.logger.setContext(BackupStoreResolver.name);
+  }
 
   async resolve(): Promise<BackupStore> {
     const store: BackupStore = {

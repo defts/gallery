@@ -79,6 +79,11 @@ const listingUnder =
 const configWithS3 = (enabled: boolean) =>
   ({ backup: { database: { ...defaults.backup.database, s3: { enabled } } } }) as SystemConfig;
 
+/** Shaped like the AWS SDK's service errors: the error code is the `name`. */
+class AccessDeniedError extends Error {
+  override name = 'AccessDenied';
+}
+
 const keepLastConfig = (keepLastAmount: number) => ({
   backup: { database: { ...systemConfigStub.backupEnabled.backup.database, keepLastAmount } },
 });
@@ -663,6 +668,18 @@ describe(DatabaseBackupService.name, () => {
         expect(remote.delete).toHaveBeenCalledWith('backups/immich-db-backup-1.sql.gz');
         expect(staging.delete).toHaveBeenCalledWith('backups/immich-db-backup-3.sql.gz.tmp');
         expect(remote.put).not.toHaveBeenCalled();
+      });
+
+      // Found on a live bucket: the job runner and the per-file log print only the message, never the
+      // cause, so a message without the S3 error gave no way to tell an AccessDenied from a DNS failure.
+      it('should name the S3 error in the messages, since logs never print the cause', async () => {
+        staging.seed('backups/immich-db-backup-1.sql.gz');
+        remote.put.mockRejectedValue(new AccessDeniedError('Access Denied.'));
+
+        await expect(sut.cleanupDatabaseBackups()).rejects.toThrow(/first error: AccessDenied: Access Denied\./);
+        expect(mocks.logger.error).toHaveBeenCalledWith(
+          expect.stringContaining('(key backups/immich-db-backup-1.sql.gz): AccessDenied: Access Denied.'),
+        );
       });
 
       it('should still succeed when the local delete fails after a good upload', async () => {
