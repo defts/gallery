@@ -21,6 +21,7 @@
   import { QueryParameter, timeToLoadTheMap } from '$lib/constants';
   import Portal from '$lib/elements/Portal.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
   import { handlePromiseError } from '$lib/utils';
   import { delay } from '$lib/utils/asset-utils';
